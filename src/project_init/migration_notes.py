@@ -35,7 +35,10 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "`infrastructure/` and `PLAN.md` is `plan.md`. `upgrade --apply` moves each "
             "file to its new name before it merges, so a local edit and your own files "
             "in a renamed directory come along, and it carries the naming gate's "
-            "baseline across the moves."
+            "baseline across the moves. Two agent rules join AGENTS.md, 'Reuse "
+            "before you write' and 'Read the docs for the installed version', and "
+            "`validate-pr` now holds a ready (non-draft) PR to a filled `Reuse:` "
+            "line and a filled `Docs:` line in its body."
         ),
         "action_required": (
             "Only repos with governance enabled and no real SYSTEM_CARD.md: after "
@@ -54,7 +57,11 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "notes) needs the new name; `.agents/scripts/install_hooks.sh` keeps working "
             "as a shim until 2026-12-01. In plugin mode the skill commands are renamed "
             "too (`/add-hook`, not `/add_hook`). Notes in `.agents/memory/` keep their "
-            "names: an upgrade never touches them."
+            "names: an upgrade never touches them. Repos with lifecycle enabled: an "
+            "open ready PR goes red on `validate-pr` until its body carries "
+            "`Reuse: none` (or what was hand-built, the library rejected and why) and "
+            "`Docs: <what was read>` (or `n/a`); editing the body re-runs the check. "
+            "Drafts are not checked."
         ),
     },
     "1.2.2": {

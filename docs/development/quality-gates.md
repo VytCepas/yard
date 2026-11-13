@@ -98,6 +98,7 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 
 | Gate | Template | Repo | Decision | Rationale |
 |---|---|---|---|---|
+| PR `Reuse:` and `Docs:` lines | ✅ blocking in `validate-pr` (ready PRs; lifecycle on) | — | **keep** template | Makes AGENTS.md's 'Reuse before you write' and 'Read the docs for the installed version' checkable at the moment a PR leaves draft: the body must carry both lines with a value, and the unfilled template fails. It checks that a decision was recorded, not that it was right; review judges that. The repo does not adopt it: its own PR template and `validate-pr` predate the rule and its PRs are scaffolder changes. |
 | `ci-gate` aggregator | ✅ single required check | ✅ single required check | **keep** both | One gate, matrix-rename-robust. |
 | ruff `check` (lint + `S`/bandit) | ✅ blocking | ✅ blocking | **keep** both | Lint + in-linter SAST. |
 | ruff `format --check` | ✅ in `just lint` | ✅ in `just lint` (PI-772) | **done** (promoted) | Repo now dogfoods the format gate it ships; CI's `checks` job runs `just lint` (check + format-check). |
