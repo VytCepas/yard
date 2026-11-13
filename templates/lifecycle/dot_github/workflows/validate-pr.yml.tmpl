@@ -3,7 +3,7 @@ name: Validate PR
 on:
   pull_request:
     branches: [{{base_branch}}]
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
 
 permissions:
   issues: read
@@ -108,3 +108,31 @@ jobs:
           fi
 
           echo "PR metadata is valid."
+
+      - name: Check reuse and docs lines
+        # Ready PRs only: start-issue opens a draft whose body is just the
+        # Closes line, and ready_for_review re-runs this when it leaves draft.
+        if: ${{ !github.event.pull_request.draft }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # A line must start the key and carry a value; the template's
+          # unfilled `<!-- ... -->` placeholder starts with `<`, so it fails.
+          missing=""
+          for key in Reuse Docs; do
+            if ! printf '%s\n' "$PR_BODY" | grep -qE "^${key}:[[:space:]]*[^<[:space:]]"; then
+              missing="$missing $key:"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "ERROR: a ready PR body needs these lines filled in:$missing"
+            echo "  Reuse: none | <what you hand-built>; rejected <library> because <why>; revisit when <trigger>"
+            echo "  Docs: <docs you read, with version> | n/a"
+            echo "See 'Reuse before you write' and 'Read the docs for the installed version' in AGENTS.md."
+            exit 1
+          fi
+
+          echo "Reuse and docs lines are present."

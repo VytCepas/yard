@@ -462,6 +462,11 @@ _ADDED_SINCE_BASELINE |= {
 }
 # A scaffold starts its decision series with a first record (harbor#1429): a new file, not move-drift.
 _ADDED_SINCE_BASELINE |= {"docs/decisions/0001-record-decisions.md"}
+# Reuse-and-docs rule (validate-pr checks Reuse:/Docs: lines): a deliberate edit and a new guide.
+_ADDED_SINCE_BASELINE |= {
+    ".github/pull_request_template.md",
+    ".agents/docs/guides/reuse-and-docs.md",
+}
 # The naming-standard rename (1.2.3) keeps shims at some old names until 2026-12-01;
 # the renamed paths themselves are re-keyed in the fixtures.
 _ADDED_SINCE_BASELINE |= SHIMMED_OLD_PATHS
