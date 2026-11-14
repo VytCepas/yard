@@ -340,6 +340,19 @@ project-init upgrade --adopt-base pyproject.toml .gitignore   # paths relative t
 project-init upgrade --apply                                   # no .new; later template changes 3-way merge
 ```
 
+**A deliberate local edit.** When a scaffolded file was changed on purpose and the
+repo's content wins, record its current bytes as its `scaffold.manifest` hash so a
+drift check that compares the working tree to the manifest (such as fleet's) reads
+clean. This needs no template render and writes only the named paths' hashes in
+`.agents/config.yaml`: no file, no other config key and no other manifest entry
+changes. It refuses a path the manifest does not list, and records nothing unless
+every path is accepted. The merge base is left as it was, so `--apply` still merges
+the edit instead of overwriting it.
+
+```bash
+project-init upgrade --adopt-manifest justfile .gitignore   # paths relative to the project
+```
+
 **Migration notes.** Alongside the file drift, upgrade prints the curated
 changelog/migration notes for the version span it crosses (recorded → target),
 with any **action required** step called out prominently — so you know *why* the

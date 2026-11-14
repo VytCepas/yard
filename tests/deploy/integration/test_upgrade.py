@@ -1318,6 +1318,134 @@ class TestAdoptBase:
             main(["upgrade", str(target), "--apply", "--adopt-base", "justfile"])
 
 
+class TestAdoptManifest:
+    """PI-1137: a deliberate local edit is recorded in scaffold.manifest, and nothing
+    else moves, so a drift check that compares the tree to the manifest reads clean."""
+
+    @staticmethod
+    def _fleet_drift(target: Path) -> list[str]:
+        """Fleet's check, reimplemented: working-tree SHA-256 vs scaffold.manifest."""
+        m = _MANIFEST_LINE_RE.search((target / _CONFIG_REL).read_text())
+        assert m, "scaffold record manifest line missing"
+        return [
+            rel
+            for rel, want in sorted(json.loads(m.group(2)).items())
+            if hashlib.sha256((target / rel).read_bytes()).hexdigest() != want
+        ]
+
+    @staticmethod
+    def _edit(target: Path, *rels: str) -> None:
+        for rel in rels:
+            path = target / rel
+            path.write_bytes(b"# DELIBERATE-LOCAL-EDIT\n" + path.read_bytes())
+
+    def test_flag_makes_the_hash_comparison_clean_and_moves_nothing_else(self, tmp_path: Path):
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        # A fresh scaffold is not drift-free: the naming baseline is seeded after the
+        # manifest is recorded. That is not this flag's business, so it stays as it was.
+        fresh = self._fleet_drift(target)
+        self._edit(target, "justfile", ".gitignore")
+        assert self._fleet_drift(target) == sorted([*fresh, "justfile", ".gitignore"])
+
+        tree = _tree_snapshot(target)
+        base = read_base(target)
+        config = (target / _CONFIG_REL).read_text()
+        before_manifest = json.loads(_MANIFEST_LINE_RE.search(config).group(2))
+
+        assert main(["upgrade", str(target), "--adopt-manifest", "justfile", ".gitignore"]) == 0
+
+        assert self._fleet_drift(target) == fresh
+        after = _tree_snapshot(target)
+        config_after = (target / _CONFIG_REL).read_text()
+        assert {k: v for k, v in after.items() if k != _CONFIG_REL.as_posix()} == {
+            k: v for k, v in tree.items() if k != _CONFIG_REL.as_posix()
+        }, "no file other than config.yaml may change, and none may be added"
+        # config.yaml differs on the manifest line only.
+        strip = lambda t: _MANIFEST_LINE_RE.sub("", t)  # noqa: E731
+        assert strip(config_after) == strip(config)
+        after_manifest = json.loads(_MANIFEST_LINE_RE.search(config_after).group(2))
+        assert set(after_manifest) == set(before_manifest)
+        moved = {k for k in after_manifest if after_manifest[k] != before_manifest[k]}
+        assert moved == {"justfile", ".gitignore"}
+        assert read_base(target) == base, "the merge base must stay as it was"
+
+    def test_needs_no_template_render(self, tmp_path: Path, monkeypatch):
+        import project_init.upgrade as up
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._edit(target, "justfile")
+
+        def no_render(*_a, **_k):
+            raise AssertionError("--adopt-manifest must not render the templates")
+
+        monkeypatch.setattr(up, "_render_staging", no_render)
+        assert main(["upgrade", str(target), "--adopt-manifest", "justfile"]) == 0
+        assert "justfile" not in self._fleet_drift(target)
+
+    def test_refuses_unlisted_and_missing_paths_atomically(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._edit(target, "justfile")
+        (target / ".gitignore").unlink()
+        config = (target / _CONFIG_REL).read_bytes()
+
+        for bad in ("not-in-the-manifest", ".gitignore", str(tmp_path / "elsewhere")):
+            capsys.readouterr()
+            rc = main(["upgrade", str(target), "--adopt-manifest", "justfile", bad])
+            assert rc == 1
+            assert bad in capsys.readouterr().err
+            assert (target / _CONFIG_REL).read_bytes() == config, "a refused batch records nothing"
+
+    def test_not_a_scaffolded_project_is_refused(self, tmp_path: Path, capsys):
+        assert main(["upgrade", str(tmp_path), "--adopt-manifest", "justfile"]) == 1
+        assert "scaffold record" in capsys.readouterr().err
+
+    def test_rerun_is_a_no_op_and_accepts_an_absolute_path(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._edit(target, "justfile")
+        assert main(["upgrade", str(target), "--adopt-manifest", "justfile"]) == 0
+        config = (target / _CONFIG_REL).read_bytes()
+
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--adopt-manifest", str(target / "justfile")]) == 0
+        assert "already matched" in capsys.readouterr().out
+        assert (target / _CONFIG_REL).read_bytes() == config
+
+    def test_apply_afterwards_still_keeps_the_edit(self, tmp_path: Path):
+        """The merge base is untouched, so the recorded hash does not make --apply
+        treat the edit as an unedited file to overwrite (#1109)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._edit(target, "justfile")
+        local = (target / "justfile").read_bytes()
+        assert main(["upgrade", str(target), "--adopt-manifest", "justfile"]) == 0
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile").read_bytes() == local
+
+    def test_warns_when_the_file_has_no_merge_base(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile, _, _ = _customise_without_base(target)
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--adopt-manifest", "justfile"]) == 0
+        assert "--adopt-base justfile" in capsys.readouterr().out
+        assert "justfile" not in self._fleet_drift(target)
+
+    def test_cannot_combine_with_apply_or_adopt_base(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        with pytest.raises(SystemExit):
+            main(["upgrade", str(target), "--apply", "--adopt-manifest", "justfile"])
+        with pytest.raises(SystemExit):
+            main(["upgrade", str(target), "--adopt-base", "justfile", "--adopt-manifest", "x"])
+
+
 class TestPreviewSeparatesTemplateFromLocal:
     """#1033: the preview diffs base→render, not local→render, so a merge that
     keeps local lines is never shown as deleting them."""

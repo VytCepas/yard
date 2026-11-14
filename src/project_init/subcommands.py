@@ -53,6 +53,7 @@ def _warn_if_stale_install() -> None:
 def _upgrade_main(argv: list[str]) -> int:
     """Parse and run the `project-init upgrade` subcommand (PI-142)."""
     from project_init.upgrade import (
+        _adopt_manifest,
         _enforce_clean_tree,
         _git_worktree_status,
         _print_undo_hint,
@@ -132,6 +133,20 @@ def _upgrade_main(argv: list[str]) -> int:
         ),
     )
     p.add_argument(
+        "--adopt-manifest",
+        action="extend",
+        nargs="+",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Record the CURRENT bytes of PATH (relative to the project) as its "
+            "scaffold.manifest hash, touching nothing else (PI-1137). Use it for a "
+            "deliberate local edit so a drift check (fleet's) reads clean. Needs no "
+            "template render. Refuses a path the manifest does not list. Cannot be "
+            "combined with --apply or --adopt-base."
+        ),
+    )
+    p.add_argument(
         "--force",
         "--allow-dirty",
         action="store_true",
@@ -146,6 +161,10 @@ def _upgrade_main(argv: list[str]) -> int:
     target = Path(args.target).resolve()
     if args.adopt_base and (args.apply or args.interactive):
         p.error("--adopt-base records merge bases only; run --apply separately afterwards")
+    if args.adopt_manifest and (args.apply or args.interactive or args.adopt_base):
+        p.error("--adopt-manifest records manifest hashes only; run it on its own")
+    if args.adopt_manifest:
+        return _adopt_manifest(target, args.adopt_manifest)  # no render, no migration
 
     # -i/--interactive is meaningless without --apply (the per-file chooser only
     # runs while applying). Silently ignoring it left users thinking they were

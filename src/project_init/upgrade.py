@@ -25,6 +25,9 @@ compared against the project:
   ``upgrade --adopt-base <path>`` records the current render as that file's base
   without touching it (#1033), so the next apply keeps the local content and
   later template changes 3-way merge.
+  ``upgrade --adopt-manifest <path>`` is the sibling for a deliberate edit: it
+  records the file's current bytes as its manifest hash (no render, nothing else
+  touched) so a drift check that compares the tree to the manifest reads clean.
 - edited locally, but the render equals its base -> local edit only (the
   template has not changed it since the base; apply leaves it alone, no diff)
 - in the old manifest, not re-rendered   -> removed (reported only; upgrade
@@ -2311,6 +2314,77 @@ def adopt_base(
         stale = target / f"{rel.as_posix()}.new"
         if stale.exists():
             print(f"  note: {stale.relative_to(target)} is left over from an earlier conflict")
+    return 0
+
+
+_MANIFEST_LINE_RE = re.compile(r"(?m)^(  manifest: )(.*)$")
+
+
+def _manifest_adoption_hashes(
+    target: Path, manifest: dict[str, str], paths: list[str]
+) -> tuple[dict[str, str], list[str]]:
+    """``({rel: current hash}, refusals)`` for the *paths* a manifest adoption names."""
+    hashes: dict[str, str] = {}
+    errors: list[str] = []
+    for raw in paths:
+        rel = _adoption_target(target, raw)
+        key = rel.as_posix()
+        if rel.is_absolute() or key not in manifest:
+            errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
+        elif not (target / rel).is_file():
+            errors.append(f"{raw}: missing locally — `upgrade --apply` restores it")
+        else:
+            hashes[key] = _hash_bytes((target / rel).read_bytes())
+    return hashes, errors
+
+
+def _adopt_manifest(target: Path, paths: list[str]) -> int:
+    """Record the CURRENT bytes of each path as its ``scaffold.manifest`` hash (PI-1137).
+
+    The route for a deliberate local edit: a drift check that compares the working
+    tree to the manifest (fleet's) then reads clean. It needs no template render, and
+    it rewrites exactly one line of ``.agents/config.yaml`` — the named paths' values
+    on the ``manifest:`` line — so no file, no other config key and no other manifest
+    entry changes. The merge base is left alone on purpose: a local edit stays
+    different from its base, so ``upgrade --apply`` still 3-way merges it instead of
+    treating it as an unedited file to overwrite (#1109).
+    All-or-nothing: one unadoptable path records nothing. Returns an exit code.
+    """
+    config_path = scaffold_record_path(target)
+    try:
+        text = config_path.read_text(encoding="utf-8")
+        parsed = _parse_record_block(text)
+    except (OSError, UnicodeDecodeError, UpgradeError) as e:
+        sys.stderr.write(f"error: --adopt-manifest cannot read the scaffold record: {e}\n")
+        return 1
+    if parsed is None:
+        sys.stderr.write(
+            f"error: --adopt-manifest needs a scaffold record in {config_path}; run "
+            "`project-init upgrade --apply` once to write it, then adopt.\n"
+        )
+        return 1
+    manifest = parsed[2]
+    hashes, errors = _manifest_adoption_hashes(target, manifest, paths)
+    if errors:
+        for err in errors:
+            sys.stderr.write(f"error: --adopt-manifest {err}\n")
+        sys.stderr.write("error: no manifest entry changed (all-or-nothing).\n")
+        return 1
+    changed = {key: h for key, h in hashes.items() if manifest[key] != h}
+    if changed:
+        updated = json.dumps({**manifest, **changed}, sort_keys=True)
+        idx = text.find(_RECORD_MARKER)
+        record = _MANIFEST_LINE_RE.sub(lambda m: m.group(1) + updated, text[idx:], count=1)
+        config_path.write_text(text[:idx] + record, encoding="utf-8", newline="\n")
+    base = read_base(target)
+    for key in sorted(hashes):
+        state = "recorded" if key in changed else "already matched"
+        print(f"adopted manifest: {key} ({state}; file unchanged)")
+        if key not in base and _decode((target / key).read_bytes()) is not None:
+            print(
+                f"  note: {key} has no merge base, so `upgrade --apply` would treat it as "
+                f"unedited; run `upgrade --adopt-base {key}` to keep it on later applies"
+            )
     return 0
 
 
