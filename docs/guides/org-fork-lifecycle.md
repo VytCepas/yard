@@ -10,7 +10,7 @@ status: unreviewed
 > path is exercised by `tests/session/integration/test_org_lifecycle.py`. This owns the
 > epic's "three-case model usable end-to-end" criterion (#253).
 
-For *why* the model is shaped this way, see [ADR-013](../adr/0013-distribution-governance-model.md)
+For *why* the model is shaped this way, see [ADR-013](../decisions/0013-distribution-governance-model.md)
 and the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
 This runbook covers the **`org`** profile; `individual` and `standalone` users do
 not need a fork.
