@@ -2388,6 +2388,50 @@ def _adopt_manifest(target: Path, paths: list[str]) -> int:
     return 0
 
 
+def _forget_manifest(target: Path, paths: list[str]) -> int:
+    """Drop each path's ``scaffold.manifest`` entry for a file the repo removed on purpose (PI-1137).
+
+    The deletion counterpart of ``_adopt_manifest``: a renamed or retired scaffold file
+    otherwise reads as ``missing`` drift forever. Only the ``manifest:`` line changes.
+    Refuses a path the manifest does not list and a path still on disk (that one is
+    ``--adopt-manifest``'s). All-or-nothing. Returns an exit code.
+    """
+    config_path = scaffold_record_path(target)
+    try:
+        text = config_path.read_text(encoding="utf-8")
+        parsed = _parse_record_block(text)
+    except (OSError, UnicodeDecodeError, UpgradeError) as e:
+        sys.stderr.write(f"error: --forget-manifest cannot read the scaffold record: {e}\n")
+        return 1
+    if parsed is None:
+        sys.stderr.write(f"error: --forget-manifest needs a scaffold record in {config_path}.\n")
+        return 1
+    manifest = parsed[2]
+    drop: set[str] = set()
+    errors: list[str] = []
+    for raw in paths:
+        rel = _adoption_target(target, raw)
+        key = rel.as_posix()
+        if rel.is_absolute() or key not in manifest:
+            errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
+        elif (target / rel).exists():
+            errors.append(f"{raw}: still present — use --adopt-manifest for an edited file")
+        else:
+            drop.add(key)
+    if errors:
+        for err in errors:
+            sys.stderr.write(f"error: --forget-manifest {err}\n")
+        sys.stderr.write("error: no manifest entry changed (all-or-nothing).\n")
+        return 1
+    updated = json.dumps({k: v for k, v in manifest.items() if k not in drop}, sort_keys=True)
+    idx = text.find(_RECORD_MARKER)
+    record = _MANIFEST_LINE_RE.sub(lambda m: m.group(1) + updated, text[idx:], count=1)
+    config_path.write_text(text[:idx] + record, encoding="utf-8", newline="\n")
+    for key in sorted(drop):
+        print(f"forgot manifest: {key} (removed on purpose; no file touched)")
+    return 0
+
+
 def _carry_naming_baseline(target: Path, renames: list[tuple[str, str]]) -> None:
     """Move the naming baseline's lines across the paths this upgrade renamed (naming standard, 1.2.3).
 

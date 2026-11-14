@@ -1446,6 +1446,62 @@ class TestAdoptManifest:
             main(["upgrade", str(target), "--adopt-base", "justfile", "--adopt-manifest", "x"])
 
 
+class TestForgetManifest:
+    """PI-1137: a scaffold file removed or renamed on purpose leaves the manifest, and
+    nothing else moves, so fleet's drift check stops reporting it missing."""
+
+    @staticmethod
+    def _manifest(target: Path) -> dict[str, str]:
+        m = _MANIFEST_LINE_RE.search((target / _CONFIG_REL).read_text())
+        assert m, "scaffold record manifest line missing"
+        return dict(json.loads(m.group(2)))
+
+    def _missing(self, target: Path) -> list[str]:
+        """Fleet's `missing` half: manifest entries with no file on disk."""
+        return sorted(rel for rel in self._manifest(target) if not (target / rel).exists())
+
+    def test_drops_only_the_named_entries_and_moves_nothing_else(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        before = self._manifest(target)
+        (target / "justfile").unlink()
+        (target / ".gitignore").unlink()
+        assert self._missing(target) == sorted(["justfile", ".gitignore"])
+        tree = _tree_snapshot(target)
+        config = (target / _CONFIG_REL).read_text()
+
+        assert main(["upgrade", str(target), "--forget-manifest", "justfile", ".gitignore"]) == 0
+
+        assert self._missing(target) == []
+        after = self._manifest(target)
+        assert after == {k: v for k, v in before.items() if k not in {"justfile", ".gitignore"}}
+        strip = lambda t: _MANIFEST_LINE_RE.sub("", t)  # noqa: E731
+        assert strip((target / _CONFIG_REL).read_text()) == strip(config)
+        rest = _tree_snapshot(target)
+        assert {k: v for k, v in rest.items() if k != _CONFIG_REL.as_posix()} == {
+            k: v for k, v in tree.items() if k != _CONFIG_REL.as_posix()
+        }, "no file other than config.yaml may change"
+
+    def test_refuses_present_and_unlisted_paths_atomically(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / "justfile").unlink()
+        config = (target / _CONFIG_REL).read_bytes()
+
+        for bad in (".gitignore", "not-in-the-manifest"):
+            capsys.readouterr()
+            assert main(["upgrade", str(target), "--forget-manifest", "justfile", bad]) == 1
+            assert "all-or-nothing" in capsys.readouterr().err
+            assert (target / _CONFIG_REL).read_bytes() == config, f"{bad} must change nothing"
+
+    def test_cannot_combine_with_other_modes(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        for extra in (["--apply"], ["--adopt-manifest", "x"], ["--adopt-base", "x"]):
+            with pytest.raises(SystemExit):
+                main(["upgrade", str(target), *extra, "--forget-manifest", "justfile"])
+
+
 class TestPreviewSeparatesTemplateFromLocal:
     """#1033: the preview diffs base→render, not local→render, so a merge that
     keeps local lines is never shown as deleting them."""

@@ -353,6 +353,15 @@ the edit instead of overwriting it.
 project-init upgrade --adopt-manifest justfile .gitignore   # paths relative to the project
 ```
 
+A scaffold file the project removed or renamed on purpose reads as `missing` drift
+instead. `--forget-manifest` drops its manifest entry, and only that: it refuses a
+path the manifest does not list or that still exists, and changes nothing unless
+every path is accepted.
+
+```bash
+project-init upgrade --forget-manifest docs/old-name.md
+```
+
 **Migration notes.** Alongside the file drift, upgrade prints the curated
 changelog/migration notes for the version span it crosses (recorded → target),
 with any **action required** step called out prominently — so you know *why* the
