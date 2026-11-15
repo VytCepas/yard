@@ -1606,7 +1606,10 @@ class TestForgetManifest:
         config = (target / _CONFIG_REL).read_bytes()
 
         assert main(["upgrade", str(target), "--forget-manifest", "justfile"]) == 1
-        assert "still present" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "dangling symlink is still on disk" in err
+        # --adopt-manifest refuses a dangling link too, so the message must not send the user there
+        assert "use --adopt-manifest" not in err
         assert (target / _CONFIG_REL).read_bytes() == config
 
     def test_cannot_combine_with_other_modes(self, tmp_path: Path):

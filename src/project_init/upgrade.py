@@ -2434,6 +2434,32 @@ def _adopt_manifest(target: Path, paths: list[str]) -> int:
     return 0
 
 
+def _manifest_forget_keys(
+    target: Path, manifest: dict[str, str], paths: list[str]
+) -> tuple[set[str], list[str]]:
+    """``({keys to drop}, refusals)`` for the *paths* a manifest forget names."""
+    drop: set[str] = set()
+    errors: list[str] = []
+    for raw in paths:
+        rel = _adoption_target(target, raw)
+        key = rel.as_posix()
+        path = target / rel
+        if rel.is_absolute() or key not in manifest:
+            errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
+        elif path.is_symlink() and not path.exists():
+            # dangling: still on disk (exists() follows it and says False), but --adopt-manifest
+            # cannot hash it either, so name the way out instead of pointing at that flag
+            errors.append(
+                f"{raw}: a dangling symlink is still on disk — remove it (or restore the file "
+                "with `upgrade --apply`), then run this again"
+            )
+        elif path.is_symlink() or path.exists():
+            errors.append(f"{raw}: still present — use --adopt-manifest for an edited file")
+        else:
+            drop.add(key)
+    return drop, errors
+
+
 def _forget_manifest(target: Path, paths: list[str]) -> int:
     """Drop each path's ``scaffold.manifest`` entry for a file the repo removed on purpose (PI-1137).
 
@@ -2453,18 +2479,7 @@ def _forget_manifest(target: Path, paths: list[str]) -> int:
         sys.stderr.write(f"error: --forget-manifest needs a scaffold record in {config_path}.\n")
         return 1
     manifest = parsed[2]
-    drop: set[str] = set()
-    errors: list[str] = []
-    for raw in paths:
-        rel = _adoption_target(target, raw)
-        key = rel.as_posix()
-        if rel.is_absolute() or key not in manifest:
-            errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
-        elif (target / rel).is_symlink() or (target / rel).exists():
-            # a dangling symlink is still on disk: exists() follows it and says False
-            errors.append(f"{raw}: still present — use --adopt-manifest for an edited file")
-        else:
-            drop.add(key)
+    drop, errors = _manifest_forget_keys(target, manifest, paths)
     if errors:
         for err in errors:
             sys.stderr.write(f"error: --forget-manifest {err}\n")
