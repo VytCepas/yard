@@ -341,3 +341,31 @@ class TestUpgradeAddsTheGate:
         seeded = (target / "gates/naming.baseline").read_bytes()
         assert run_upgrade(target, apply=True) == 0
         assert (target / "gates/naming.baseline").read_bytes() == seeded
+
+
+def test_repo_overlay_registers_forget(tmp_path: Path) -> None:
+    """PI-1137: `forget` (the --forget-manifest verb) is a registered word of this repo.
+
+    Judges a scratch root holding only a ``forget-x.sh`` file and this repo's own
+    naming-words.tsv with the vendored lint, as the real gate does for a root overlay.
+    """
+    repo = Path(__file__).resolve().parents[3]
+    lint = repo / "templates/base/vendor/naming/lint-name.sh"
+
+    def warnings(root: Path) -> str:
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        (root / "forget-x.sh").write_text("")
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        done = subprocess.run(
+            ["sh", str(lint), "--root", str(root)], capture_output=True, text=True, check=False
+        )
+        return done.stdout + done.stderr
+
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    assert "`forget` is in no registry" in warnings(bare)  # the probe can fail
+
+    overlaid = tmp_path / "overlaid"
+    overlaid.mkdir()
+    shutil.copy(repo / "naming-words.tsv", overlaid / "naming-words.tsv")
+    assert "`forget` is in no registry" not in warnings(overlaid)
