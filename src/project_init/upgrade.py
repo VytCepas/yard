@@ -28,6 +28,8 @@ compared against the project:
   ``upgrade --adopt-manifest <path>`` is the sibling for a deliberate edit: it
   records the file's current bytes as its manifest hash (no render, nothing else
   touched) so a drift check that compares the tree to the manifest reads clean.
+  It refuses a path with no merge base (run ``--adopt-base`` first), since apply
+  would overwrite that edit.
 - edited locally, but the render equals its base -> local edit only (the
   template has not changed it since the base; apply leaves it alone, no diff)
 - in the old manifest, not re-rendered   -> removed (reported only; upgrade
@@ -57,7 +59,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from rich.console import Console
     from rich.text import Text
@@ -715,20 +717,31 @@ def _str_map(raw: object) -> dict[str, str] | None:
     return dict(raw)
 
 
-def _record_fields(
-    lines: list[str],
-) -> tuple[str | None, dict[str, str] | None, dict[str, str] | None]:
-    """Extract preset/variables/manifest from the lines after the marker."""
-    preset = variables = manifest = None
+def _record_block_lines(lines: list[str]) -> Iterator[tuple[int, str]]:
+    """Yield ``(index, line)`` for each line inside the ``scaffold:`` mapping of the record.
+
+    The one definition of "inside the record", shared by the reader
+    (:func:`_record_fields`) and the writer (:func:`_replace_manifest_line`) so a
+    write can only ever hit a line the reader read (PI-1137).
+    """
     in_block = False
-    for line in lines:
+    for i, line in enumerate(lines):
         if line.startswith("scaffold:"):
             in_block = True
             continue
         if not in_block:
             continue
         if line.strip() and not line.startswith(" "):
-            break  # the scaffold mapping ended
+            return  # the scaffold mapping ended
+        yield i, line
+
+
+def _record_fields(
+    lines: list[str],
+) -> tuple[str | None, dict[str, str] | None, dict[str, str] | None]:
+    """Extract preset/variables/manifest from the lines after the marker."""
+    preset = variables = manifest = None
+    for _, line in _record_block_lines(lines):
         stripped = line.strip()
         if stripped.startswith("preset:"):
             preset = _scalar(stripped)
@@ -2317,13 +2330,42 @@ def adopt_base(
     return 0
 
 
-_MANIFEST_LINE_RE = re.compile(r"(?m)^(  manifest: )(.*)$")
+def _replace_manifest_line(text: str, manifest: dict[str, str]) -> str:
+    """*text* with the record's ``manifest:`` line rewritten to *manifest*; nothing else moves.
+
+    Finds the line through :func:`_record_block_lines`, the reader's own walk, so
+    any indent works. It raises :class:`UpgradeError` unless exactly one line
+    matches: a silent no-op would let a flag print success and change nothing.
+    """
+    idx = text.find(_RECORD_MARKER)
+    head, tail = text[:idx], text[idx:]
+    lines = tail.splitlines(keepends=True)
+    hits = [i for i, line in _record_block_lines(lines) if line.strip().startswith("manifest:")]
+    if len(hits) != 1:
+        msg = (
+            f"scaffold record has {len(hits)} `manifest:` lines in .agents/config.yaml "
+            "(expected exactly 1); fix the block by hand, nothing was changed."
+        )
+        raise UpgradeError(msg)
+    i = hits[0]
+    line = lines[i]
+    eol = line[len(line.rstrip("\r\n")) :]
+    indent = line[: len(line) - len(line.lstrip())]
+    lines[i] = f"{indent}manifest: {json.dumps(manifest, sort_keys=True)}{eol}"
+    return head + "".join(lines)
 
 
 def _manifest_adoption_hashes(
-    target: Path, manifest: dict[str, str], paths: list[str]
+    target: Path, manifest: dict[str, str], base: dict[str, str], paths: list[str]
 ) -> tuple[dict[str, str], list[str]]:
-    """``({rel: current hash}, refusals)`` for the *paths* a manifest adoption names."""
+    """``({rel: current hash}, refusals)`` for the *paths* a manifest adoption names.
+
+    A path with no merge-base entry is refused: ``upgrade --apply`` would read the
+    recorded hash as "unedited" and overwrite the edit (#1109). The base, not the
+    manifest hash, is what makes an edit survive an apply, and it cannot be set to
+    the local bytes (local == base reads as unedited too), so ``--adopt-base``
+    must record it first.
+    """
     hashes: dict[str, str] = {}
     errors: list[str] = []
     for raw in paths:
@@ -2333,6 +2375,12 @@ def _manifest_adoption_hashes(
             errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
         elif not (target / rel).is_file():
             errors.append(f"{raw}: missing locally — `upgrade --apply` restores it")
+        elif key not in base:
+            errors.append(
+                f"{raw}: no merge base, so a later `upgrade --apply` would overwrite the edit; "
+                f"run `project-init upgrade --adopt-base {raw}` first (binary files have no "
+                "merge base and cannot be adopted)"
+            )
         else:
             hashes[key] = _hash_bytes((target / rel).read_bytes())
     return hashes, errors
@@ -2344,10 +2392,11 @@ def _adopt_manifest(target: Path, paths: list[str]) -> int:
     The route for a deliberate local edit: a drift check that compares the working
     tree to the manifest (fleet's) then reads clean. It needs no template render, and
     it rewrites exactly one line of ``.agents/config.yaml`` — the named paths' values
-    on the ``manifest:`` line — so no file, no other config key and no other manifest
+    on the ``manifest:`` line, at whatever indent the parser reads it — so no file, no other config key and no other manifest
     entry changes. The merge base is left alone on purpose: a local edit stays
     different from its base, so ``upgrade --apply`` still 3-way merges it instead of
-    treating it as an unedited file to overwrite (#1109).
+    treating it as an unedited file to overwrite (#1109). A path with no base is
+    refused, because without one the edit would be overwritten.
     All-or-nothing: one unadoptable path records nothing. Returns an exit code.
     """
     config_path = scaffold_record_path(target)
@@ -2364,7 +2413,8 @@ def _adopt_manifest(target: Path, paths: list[str]) -> int:
         )
         return 1
     manifest = parsed[2]
-    hashes, errors = _manifest_adoption_hashes(target, manifest, paths)
+    base = read_base(target)
+    hashes, errors = _manifest_adoption_hashes(target, manifest, base, paths)
     if errors:
         for err in errors:
             sys.stderr.write(f"error: --adopt-manifest {err}\n")
@@ -2372,19 +2422,15 @@ def _adopt_manifest(target: Path, paths: list[str]) -> int:
         return 1
     changed = {key: h for key, h in hashes.items() if manifest[key] != h}
     if changed:
-        updated = json.dumps({**manifest, **changed}, sort_keys=True)
-        idx = text.find(_RECORD_MARKER)
-        record = _MANIFEST_LINE_RE.sub(lambda m: m.group(1) + updated, text[idx:], count=1)
-        config_path.write_text(text[:idx] + record, encoding="utf-8", newline="\n")
-    base = read_base(target)
+        try:
+            new_text = _replace_manifest_line(text, {**manifest, **changed})
+        except UpgradeError as e:
+            sys.stderr.write(f"error: --adopt-manifest {e}\n")
+            return 1
+        config_path.write_text(new_text, encoding="utf-8", newline="\n")
     for key in sorted(hashes):
         state = "recorded" if key in changed else "already matched"
         print(f"adopted manifest: {key} ({state}; file unchanged)")
-        if key not in base and _decode((target / key).read_bytes()) is not None:
-            print(
-                f"  note: {key} has no merge base, so `upgrade --apply` would treat it as "
-                f"unedited; run `upgrade --adopt-base {key}` to keep it on later applies"
-            )
     return 0
 
 
@@ -2414,7 +2460,8 @@ def _forget_manifest(target: Path, paths: list[str]) -> int:
         key = rel.as_posix()
         if rel.is_absolute() or key not in manifest:
             errors.append(f"{raw}: not in scaffold.manifest (not a file the scaffolder recorded)")
-        elif (target / rel).exists():
+        elif (target / rel).is_symlink() or (target / rel).exists():
+            # a dangling symlink is still on disk: exists() follows it and says False
             errors.append(f"{raw}: still present — use --adopt-manifest for an edited file")
         else:
             drop.add(key)
@@ -2423,10 +2470,14 @@ def _forget_manifest(target: Path, paths: list[str]) -> int:
             sys.stderr.write(f"error: --forget-manifest {err}\n")
         sys.stderr.write("error: no manifest entry changed (all-or-nothing).\n")
         return 1
-    updated = json.dumps({k: v for k, v in manifest.items() if k not in drop}, sort_keys=True)
-    idx = text.find(_RECORD_MARKER)
-    record = _MANIFEST_LINE_RE.sub(lambda m: m.group(1) + updated, text[idx:], count=1)
-    config_path.write_text(text[:idx] + record, encoding="utf-8", newline="\n")
+    try:
+        new_text = _replace_manifest_line(
+            text, {k: v for k, v in manifest.items() if k not in drop}
+        )
+    except UpgradeError as e:
+        sys.stderr.write(f"error: --forget-manifest {e}\n")
+        return 1
+    config_path.write_text(new_text, encoding="utf-8", newline="\n")
     for key in sorted(drop):
         print(f"forgot manifest: {key} (removed on purpose; no file touched)")
     return 0

@@ -345,18 +345,21 @@ repo's content wins, record its current bytes as its `scaffold.manifest` hash so
 drift check that compares the working tree to the manifest (such as fleet's) reads
 clean. This needs no template render and writes only the named paths' hashes in
 `.agents/config.yaml`: no file, no other config key and no other manifest entry
-changes. It refuses a path the manifest does not list, and records nothing unless
-every path is accepted. The merge base is left as it was, so `--apply` still merges
-the edit instead of overwriting it.
+changes. It refuses a path the manifest does not list, a file missing locally and a
+file with no merge base, and records nothing unless every path is accepted. The merge
+base is left as it was, so `--apply` still merges the edit instead of overwriting it;
+that is why a path with no base is refused: record one first with
+`upgrade --adopt-base <path>`. `-i/--interactive` is refused.
 
 ```bash
+project-init upgrade --adopt-base justfile                  # only when the file has no merge base
 project-init upgrade --adopt-manifest justfile .gitignore   # paths relative to the project
 ```
 
 A scaffold file the project removed or renamed on purpose reads as `missing` drift
 instead. `--forget-manifest` drops its manifest entry, and only that: it refuses a
-path the manifest does not list or that still exists, and changes nothing unless
-every path is accepted.
+path the manifest does not list or that still exists (a symlink counts, dangling or
+not), and changes nothing unless every path is accepted. `-i/--interactive` is refused.
 
 ```bash
 project-init upgrade --forget-manifest docs/old-name.md

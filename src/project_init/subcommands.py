@@ -143,8 +143,10 @@ def _upgrade_main(argv: list[str]) -> int:
             "Record the CURRENT bytes of PATH (relative to the project) as its "
             "scaffold.manifest hash, touching nothing else (PI-1137). Use it for a "
             "deliberate local edit so a drift check (fleet's) reads clean. Needs no "
-            "template render. Refuses a path the manifest does not list. Cannot be "
-            "combined with --apply or --adopt-base."
+            "template render. All-or-nothing: refuses a path the manifest does not "
+            "list, a file missing locally, and a file with no merge base (run "
+            "--adopt-base PATH first, or --apply would overwrite the edit). Cannot be "
+            "combined with --apply, -i/--interactive or --adopt-base."
         ),
     )
     p.add_argument(
@@ -157,8 +159,8 @@ def _upgrade_main(argv: list[str]) -> int:
             "Drop PATH's scaffold.manifest entry for a scaffold file the project "
             "removed or renamed on purpose, so a drift check stops reporting it "
             "missing (PI-1137). Refuses a path the manifest does not list or that "
-            "still exists. Cannot be combined with --apply, --adopt-base or "
-            "--adopt-manifest."
+            "still exists (a symlink counts as existing). Cannot be combined with "
+            "--apply, -i/--interactive, --adopt-base or --adopt-manifest."
         ),
     )
     p.add_argument(
