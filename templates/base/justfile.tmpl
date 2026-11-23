@@ -79,9 +79,11 @@ test-mutation:
 # It audits the exported lock, never an environment: `uv run --with pip-audit`
 # scanned pip-audit's own dependencies too, and a stale certifi there held a
 # project with none red for a week (PI-1111).
+# --cache-dir: platformdirs 4.14 refuses pip-audit's default cache when $HOME is
+# writable by another user, as /home/runner is on GitHub-hosted runners.
 [doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
 audit:
-    sh -c 'if [ -f pyproject.toml ] || [ -f uv.lock ]; then f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f"; rc=$?; rm -f "$f"; exit "$rc"; elif [ -f requirements.txt ]; then uvx pip-audit -r requirements.txt; else echo "No Python dependency manifest yet — nothing to audit."; fi'
+    sh -c 'if [ -f pyproject.toml ] || [ -f uv.lock ]; then f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f" --cache-dir "${XDG_CACHE_HOME:-$HOME/.cache}/pip-audit"; rc=$?; rm -f "$f"; exit "$rc"; elif [ -f requirements.txt ]; then uvx pip-audit -r requirements.txt --cache-dir "${XDG_CACHE_HOME:-$HOME/.cache}/pip-audit"; else echo "No Python dependency manifest yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the runtime dependency tree (#574). release.yml
 # attaches this to GitHub Releases; run locally on demand. --no-dev so it

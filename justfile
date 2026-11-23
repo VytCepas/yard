@@ -87,9 +87,11 @@ docs:
 # Since PI-1111 it audits the exported lock (every extra and group, so the docs
 # extra above is still in scope) instead of an environment: `--with pip-audit`
 # also scanned pip-audit's own dependencies.
+# --cache-dir: platformdirs 4.14 refuses pip-audit's default cache when $HOME is
+# writable by another user, as /home/runner is on GitHub-hosted runners.
 [doc("scan dependencies for known CVEs (#637)")]
 audit:
-    sh -c 'f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f"; rc=$?; rm -f "$f"; exit "$rc"'
+    sh -c 'f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f" --cache-dir "${XDG_CACHE_HOME:-$HOME/.cache}/pip-audit"; rc=$?; rm -f "$f"; exit "$rc"'
 
 # dependency license compliance scan (#579) — fail on copyleft (GPL/AGPL; also
 # LGPL, since --partial-match is substring-based). Advisory in CI (not in
