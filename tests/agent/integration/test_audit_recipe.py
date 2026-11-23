@@ -88,6 +88,13 @@ def test_audit_hands_pip_audit_the_exported_lock(audited):
     ]
 
 
+def test_audit_names_its_own_cache_dir(audited):
+    """platformdirs 4.14 refuses pip-audit's default cache under a shared $HOME (hosted runners)."""
+    _, log = audited
+    args = [line for line in log.splitlines() if line.startswith("uvx ")][0].split()
+    assert args[args.index("--cache-dir") + 1].endswith("/pip-audit")
+
+
 def test_audit_reads_exactly_what_uv_export_printed(audited):
     _, log = audited
     assert PIN in log.splitlines()
