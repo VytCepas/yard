@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -43,7 +44,9 @@ def test_uv_records_the_hold_in_the_lock(tmp_target: Path) -> None:
     start = config.index("[dependency-groups]")
     end = config.index("]\n", config.index("dev = [")) + 2
     pyproject.write_text(config[:start] + config[end:], encoding="utf-8")
-    subprocess.run(["uv", "lock", "--offline"], cwd=target, check=True, capture_output=True)
+    # conftest moves UV_PYTHON_INSTALL_DIR, so a runner with only a managed Python finds none.
+    cmd = ["uv", "lock", "--offline", "--python", sys.executable]
+    subprocess.run(cmd, cwd=target, check=True, capture_output=True)
     lock = (target / "uv.lock").read_text(encoding="utf-8")
     assert 'exclude-newer-span = "P7D"' in lock
 
