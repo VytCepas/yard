@@ -28,7 +28,6 @@ def _inputs(*, coauthor: bool = True) -> ScaffoldInputs:
         project_name="p",
         project_description="d",
         language="python",
-        selected_mcps=[],
         owner="",
         license_choice="none",
         devcontainer=False,
@@ -222,8 +221,6 @@ class TestInteractiveFlags:
         monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
         # ADR-029: open the group under test so its prompts are reachable.
         monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"details"})
-        monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "none")

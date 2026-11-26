@@ -143,7 +143,8 @@ class TestAIBOM:
         target = _scaffold(tmp_path / "p")
         aibom = (target / _GOV / "ai-bom.generated.md").read_text()
         assert "Do not edit by hand" in aibom
-        assert "_None installed._" in aibom
+        assert "ships no MCP servers" in aibom
+        assert "context7" not in aibom
         assert "Multi-model (CCR) overlay not installed" in aibom
 
     def test_detects_ccr_routes_when_multi_model_on(self, tmp_path: Path):

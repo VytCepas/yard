@@ -29,9 +29,6 @@ from project_init.cli_output import (
     _print_conflicts as _print_conflicts,
 )
 from project_init.cli_output import (
-    _print_mcp_commands as _print_mcp_commands,
-)
-from project_init.cli_output import (
     _print_profile_notice as _print_profile_notice,
 )
 from project_init.cli_output import (
@@ -62,6 +59,9 @@ from project_init.cli_parser import (
 )
 from project_init.cli_parser import (
     _reject_python_version_without_python as _reject_python_version_without_python,
+)
+from project_init.cli_parser import (
+    _reject_retired_mcp_flags as _reject_retired_mcp_flags,
 )
 from project_init.cli_parser import (
     _require_non_interactive_args as _require_non_interactive_args,
@@ -185,9 +185,6 @@ from project_init.variables import (
     _resolve_inputs as _resolve_inputs,
 )
 from project_init.variables import (
-    _resolve_mcps_non_interactive as _resolve_mcps_non_interactive,
-)
-from project_init.variables import (
     _resolve_preset_lifecycle as _resolve_preset_lifecycle,
 )
 from project_init.variables import (
@@ -229,9 +226,6 @@ from project_init.wizard_prompts import (
     _choose_bootstrap_interactive as _choose_bootstrap_interactive,
 )
 from project_init.wizard_prompts import (
-    _choose_browser_interactive as _choose_browser_interactive,
-)
-from project_init.wizard_prompts import (
     _choose_coauthor_interactive as _choose_coauthor_interactive,
 )
 from project_init.wizard_prompts import (
@@ -254,9 +248,6 @@ from project_init.wizard_prompts import (
 )
 from project_init.wizard_prompts import (
     _choose_lifecycle_interactive as _choose_lifecycle_interactive,
-)
-from project_init.wizard_prompts import (
-    _choose_mcps_interactive as _choose_mcps_interactive,
 )
 from project_init.wizard_prompts import (
     _choose_memory_interactive as _choose_memory_interactive,
@@ -293,9 +284,6 @@ from project_init.wizard_prompts import (
 )
 from project_init.wizard_prompts import (
     _gather_inputs_interactive as _gather_inputs_interactive,
-)
-from project_init.wizard_prompts import (
-    _gather_mcps_interactive as _gather_mcps_interactive,
 )
 from project_init.wizard_prompts import (
     _print_wizard_guidance as _print_wizard_guidance,
@@ -426,6 +414,7 @@ def _cli(argv: list[str]) -> int:
         return _dispatch[argv[0]](argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
+    _reject_retired_mcp_flags(args, parser)
 
     presets = list_presets()
     if not presets:
@@ -527,8 +516,6 @@ def _cli(argv: list[str]) -> int:
             cli_language=args.language,
             cli_owner=args.owner,
             cli_license=args.license,
-            cli_mcps=args.mcps,
-            cli_browser=args.browser,
             cli_devcontainer=args.devcontainer,
             cli_mise=args.mise,
             cli_vscode=args.vscode,

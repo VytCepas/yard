@@ -1,12 +1,11 @@
 """Per-surface agent-config generation (ADR-017, PI-366).
 
-One canonical source — the surface table here plus the MCP catalog
-(`mcps.py`) and the shared guard adapter — rendered outward to each non-CLI
+One canonical source — the surface table here plus the shared guard adapter —
+rendered outward to each non-CLI
 agent surface's native files. Pure, deterministic functions only (ADR-001: no
 LLM, no I/O in this module); the scaffold engine writes the rendered strings.
 
 Confidence (from the #365 spike, `docs/development/non-cli-surface-matrix.md`):
-- **MCP** schemas are HIGH confidence and fully specifiable here.
 - **Hooks** file paths + event names are validated, but the exact blocking
   stdin/stdout contract for Cursor/Antigravity was not live-verified, so the
   emitted hooks are **best-effort and fail-open** — git/CI remain the real
@@ -16,7 +15,8 @@ Claude Code (CLI + VS Code extension) reads its config from `.claude/`, which th
 scaffolder keeps as a delete-aware mirror of the canonical `.agents/` tree (plain
 files, portable across OSes — see `_generate_claude_projection`), so it needs no
 per-surface emission here; Codex/Gemini already have overlays. This module adds
-the cross-surface MCP files and the GUI hook configs (Cursor, Antigravity).
+the GUI hook configs (Cursor, Antigravity). It renders no MCP config: the
+scaffold ships no MCP servers (operator decision 2026-11-26).
 """
 
 from __future__ import annotations
@@ -41,88 +41,6 @@ def _guard_command(surface: str) -> str:
         'sh -c \'cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && '
         f"exec .agents/hooks/python-resolve.sh .agents/hooks/admission_agent_adapter.py {surface}'"
     )
-
-
-# --- canonical MCP rendering -------------------------------------------------
-
-
-def mcp_server_specs(selected: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Canonical {name: {command,args}|{url}} from selected catalog entries.
-
-    Entries without a structured ``server`` spec (none today) are skipped.
-    """
-    out: dict[str, dict[str, Any]] = {}
-    for m in selected:
-        spec = m.get("server")
-        if spec:
-            out[m["id"]] = dict(spec)
-    return out
-
-
-def render_mcp_json(
-    servers: dict[str, dict[str, Any]], *, key: str, drop_type: bool = False
-) -> str:
-    """MCP config as JSON.
-
-    ``key`` is the top-level wrapper: ``mcpServers`` (Claude root .mcp.json,
-    Cursor, Junie), ``servers`` (VS Code), or ``amp.mcpServers`` (Amp). With
-    ``drop_type=True`` the ``type`` field is stripped from each server — Amp and
-    Junie infer transport from ``command`` vs ``url`` and take no ``type`` (PI-397).
-    """
-    if drop_type:
-        servers = {
-            name: {k: v for k, v in spec.items() if k != "type"} for name, spec in servers.items()
-        }
-    return json.dumps({key: servers}, indent=2, sort_keys=True) + "\n"
-
-
-def render_antigravity_mcp(servers: dict[str, dict[str, Any]]) -> str:
-    """MCP config for Antigravity's ``.agents/mcp_config.json``.
-
-    Antigravity (Windsurf/Codeium + Gemini lineage) keys HTTP/streamable servers
-    by ``serverUrl`` — no ``type``, not ``url`` — unlike Cursor/Claude which use
-    ``type``+``url`` (an HTTP entry written as ``{"type":"http","url":...}`` fails
-    to load). Stdio servers (``command``/``args``) are emitted unchanged (#431).
-    """
-    mapped: dict[str, dict[str, Any]] = {}
-    for name, spec in servers.items():
-        if "url" in spec:
-            rest = {k: v for k, v in spec.items() if k not in ("type", "url")}
-            mapped[name] = {"serverUrl": spec["url"], **rest}
-        else:
-            mapped[name] = dict(spec)
-    return json.dumps({"mcpServers": mapped}, indent=2, sort_keys=True) + "\n"
-
-
-def render_mcp_toml(servers: dict[str, dict[str, Any]]) -> str:
-    """MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
-
-    Stdlib only (no toml writer): every string is emitted via ``json.dumps`` —
-    TOML basic strings share JSON's escaping for quotes, backslashes, and
-    control chars — so values can't produce invalid TOML. Passes through ``env``
-    (stdio) and ``bearer_token_env_var`` (HTTP) so servers that need a secret
-    aren't silently dropped (PI-388).
-    """
-    lines: list[str] = []
-    for name in sorted(servers):
-        spec = servers[name]
-        lines.append(f"[mcp_servers.{name}]")
-        if "command" in spec:
-            lines.append(f"command = {json.dumps(spec['command'])}")
-            if spec.get("args"):
-                rendered = ", ".join(json.dumps(a) for a in spec["args"])
-                lines.append(f"args = [{rendered}]")
-        if "url" in spec:
-            lines.append(f"url = {json.dumps(spec['url'])}")
-            if spec.get("bearer_token_env_var"):
-                lines.append(f"bearer_token_env_var = {json.dumps(spec['bearer_token_env_var'])}")
-        if spec.get("env"):
-            rendered_env = ", ".join(
-                f"{json.dumps(k)} = {json.dumps(v)}" for k, v in spec["env"].items()
-            )
-            lines.append(f"env = {{{rendered_env}}}")
-        lines.append("")
-    return "\n".join(lines)
 
 
 # --- canonical hook rendering (best-effort, fail-open) -----------------------
@@ -170,9 +88,9 @@ def render_antigravity_hooks() -> str:
 
 
 # --- the surface table -------------------------------------------------------
-# One entry per surface that needs project-scoped hook/MCP emission. Claude
-# (CLI/ext) and Codex (overlay) are intentionally absent. Antigravity (hooks + MCP)
-# and Amp/Junie (MCP-only) also ship their skills via template layers (PI-386/397).
+# One entry per surface that needs project-scoped hook emission. Claude
+# (CLI/ext), Codex (overlay), Amp and Junie (template layers only) are intentionally
+# absent. Antigravity also ships its skills via a template layer (PI-386).
 # Each entry declares what files to write; the scaffold engine consumes this.
 # (ADR-017 §2.)
 
@@ -182,8 +100,6 @@ SURFACES: dict[str, dict[str, Any]] = {
         "experimental": False,
         "hooks_file": ".cursor/hooks.json",
         "hooks_render": render_cursor_hooks,
-        "mcp_file": ".cursor/mcp.json",
-        "mcp_render": ("json", "mcpServers"),
         # skills cross-read from .agents/skills — no emission needed.
     },
     "antigravity": {
@@ -191,83 +107,30 @@ SURFACES: dict[str, dict[str, Any]] = {
         "experimental": True,
         "hooks_file": ".agents/hooks.json",
         "hooks_render": render_antigravity_hooks,
-        # Antigravity reads project-scoped MCP from .agents/mcp_config.json (PI-386);
         # skills come from the antigravity template layer's .agents/skills.
-        # HTTP servers need the serverUrl key (not type+url) — dedicated renderer (#431).
-        "mcp_file": ".agents/mcp_config.json",
-        "mcp_render": ("antigravity", "mcpServers"),
-    },
-    "amp": {
-        "label": "Amp",
-        "experimental": False,
-        "hooks_file": None,
-        "hooks_render": None,
-        # Amp reads project MCP from .amp/settings.json under the flat dotted key
-        # `amp.mcpServers` (stdio/url, no `type`); skills from .agents/skills (PI-397).
-        # NOTE: .amp/settings.json may hold other Amp keys. emit() never clobbers an
-        # existing file — it writes a `.new` sibling on any diff (PI-179) — so a user
-        # with prior settings reviews/merges manually; a fresh scaffold writes it clean.
-        "mcp_file": ".amp/settings.json",
-        "mcp_render": ("json", "amp.mcpServers", True),
-    },
-    "junie": {
-        "label": "JetBrains Junie",
-        "experimental": False,
-        "hooks_file": None,
-        "hooks_render": None,
-        # Junie reads project MCP from .junie/mcp/mcp.json (`mcpServers`, no `type`);
-        # skills from .junie/skills (PI-397).
-        "mcp_file": ".junie/mcp/mcp.json",
-        "mcp_render": ("json", "mcpServers", True),
     },
 }
 
 
-def render_mcp_for(kind_key: tuple[Any, ...], servers: dict[str, dict[str, Any]]) -> str:
-    """Render MCP config for a ``(format, key[, drop_type])`` spec."""
-    fmt, key, *rest = kind_key
-    if fmt == "json":
-        return render_mcp_json(servers, key=key, drop_type=bool(rest and rest[0]))
-    if fmt == "toml":
-        return render_mcp_toml(servers)
-    if fmt == "antigravity":
-        return render_antigravity_mcp(servers)
-    raise ValueError(f"unknown MCP format: {fmt}")
-
-
-def surface_files(surface: str, servers: dict[str, dict[str, Any]]) -> dict[str, str]:
-    """All files to write for a selected *surface*: {relpath: content}.
-
-    *servers* is the canonical MCP spec (may be empty → no MCP file).
-    """
+def surface_files(surface: str) -> dict[str, str]:
+    """All files to write for a selected *surface*: {relpath: content}."""
     spec = SURFACES[surface]
     files: dict[str, str] = {}
     if spec.get("hooks_file") and spec.get("hooks_render"):
         files[spec["hooks_file"]] = spec["hooks_render"]()
-    if servers and spec.get("mcp_file") and spec.get("mcp_render"):
-        files[spec["mcp_file"]] = render_mcp_for(spec["mcp_render"], servers)
     return files
 
 
-def planned_files(agents: list[str], servers: dict[str, dict[str, Any]]) -> dict[str, str]:
+def planned_files(agents: list[str]) -> dict[str, str]:
     """Map a selection to ``{relpath: content}``.
 
-    The single place that maps selected *agents* + canonical *servers* to files,
-    so the scaffold step and the drift contract test share one source of truth.
+    The single place that maps selected *agents* to files, so the scaffold step
+    and the drift contract test share one source of truth.
     """
     files: dict[str, str] = {}
-    # Claude's shareable project MCP scope is a root .mcp.json — always useful
-    # when MCPs are selected (Claude is always a target). ADR-017 / #365 spike.
-    if servers:
-        files[".mcp.json"] = render_mcp_json(servers, key="mcpServers")
     for surface in agents:
         if surface in SURFACES:
-            files.update(surface_files(surface, servers))
-    # MCP-only surfaces selected as agents.
-    if "codex" in agents and servers:
-        files[".codex/config.toml"] = render_mcp_toml(servers)
-    if "vscode" in agents and servers:
-        files[".vscode/mcp.json"] = render_mcp_json(servers, key="servers")
+            files.update(surface_files(surface))
     return files
 
 
@@ -275,7 +138,6 @@ def emit(
     target: Path,
     *,
     agents: list[str],
-    servers: dict[str, dict[str, Any]],
     conflicts: list[tuple[Path, Path]] | None = None,
 ) -> list[Path]:
     """Write the per-surface config files into *target*.
@@ -296,7 +158,7 @@ def emit(
     from project_init.scaffold import _new_sibling
 
     written: list[Path] = []
-    for rel, content in planned_files(agents, servers).items():
+    for rel, content in planned_files(agents).items():
         dest = target / rel
         encoded = content.encode("utf-8")
         # Compare bytes, not decoded text: a non-UTF-8 existing file must not

@@ -26,7 +26,7 @@ check) before first use.
 | Surface | Status | Notes |
 |---|---|---|
 | Claude Code (CLI / IDE) | allowed | primary agent surface |
-| `<MCP servers in use, e.g. context7>` | allowed | read-only docs fetch |
+| `<MCP servers in use, if any>` | `<status>` | `<pinned version; why it is needed>` |
 | `<add rows>` | | |
 
 ## Allowed — use cases

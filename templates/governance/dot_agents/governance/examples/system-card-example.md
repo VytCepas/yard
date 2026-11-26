@@ -56,7 +56,7 @@ edit or discard any draft. No autonomous customer-facing action exists.
 
 See [`ai-declarations.md`](../ai-declarations.md) — the user-maintained record of
 models and APIs this system calls directly (the gate checks that file exists and
-is filled in). The generated inventory of installed MCP servers and detected CCR
+is filled in). The generated inventory of detected CCR
 routes is in [`ai-bom.generated.md`](../ai-bom.generated.md).
 
 ## Standards mapping (adopted reference — dated, not gate logic)

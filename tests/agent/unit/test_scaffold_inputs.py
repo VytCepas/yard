@@ -34,7 +34,6 @@ def test_resolve_inputs_returns_named_record():
     assert inputs.language == "python"
     assert inputs.agents == ["claude"]
     assert inputs.no_plugin is True
-    assert inputs.selected_mcps == []
 
 
 def test_resolve_inputs_none_when_interactive():

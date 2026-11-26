@@ -161,8 +161,6 @@ def _wizard(
     # ADR-029: the gateway stays closed unless a test opens a group — identity
     # prompts bind positionally.
     monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: set(opened))
-    monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
-    monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
     monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
     monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
     monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")

@@ -34,8 +34,8 @@ ISO/IEC 42001, the EU AI Act, and the OWASP LLM/Agentic Top 10.
   copy-me alternative to a card when this repo ships **no** AI system. Copy it to
   `.agents/governance/NO_AI_SYSTEM.md` and fill in a `reason` and a `declared_on`
   date.
-- `ai-bom.generated.md` — a generated **AIBOM** (installed MCP servers + detected
-  CCR routes), regenerated each scaffold/upgrade. Do not hand-edit.
+- `ai-bom.generated.md` — a generated **AIBOM** (detected CCR routes; the
+  scaffold ships no MCP servers), regenerated each scaffold/upgrade. Do not hand-edit.
 - [`ai-declarations.md`](ai-declarations.md) — the user-owned counterpart for
   models/APIs called directly; seeded once and preserved.
 - `../scripts/governance-gate.sh` (+ `governance_gate.py`) — the **CI gate**. It

@@ -84,7 +84,7 @@ def _box(**kw) -> BoxProfile:
 
 
 class TestWizardSeeding:
-    def test_seeds_agents_mcps_profile_and_prints_one_advisory_line(self, monkeypatch, capsys):
+    def test_seeds_agents_and_profile_and_prints_one_advisory_line(self, monkeypatch, capsys):
         inputs = _enter_only(
             monkeypatch,
             box_profile=_box(
@@ -94,12 +94,13 @@ class TestWizardSeeding:
             ),
         )
         assert inputs.agents == ["claude", "codex"]
-        assert [m["id"] for m in inputs.selected_mcps] == ["context7"]
         assert inputs.profile == "org"
         out = capsys.readouterr().out
         assert out.count("Box profile: /box/box-profile.toml") == 1
         assert "agents=claude,codex" in out
-        assert "mcps=context7" in out
+        # No MCP servers ship (2026-11-26): the roster is never a seed, only reported.
+        assert "mcps=" not in out
+        assert "context7" in out
         assert "profile=org" in out
         # Single tokens: rich wraps the advisory line at 80 columns.
         assert "ignored" in out
@@ -115,11 +116,9 @@ class TestWizardSeeding:
             monkeypatch,
             box_profile=_box(harnesses=("codex",), mcp_roster=("context7-http",), profile="org"),
             cli_agents="claude",
-            cli_mcps="context7",
             profile="individual",
         )
         assert inputs.agents == ["claude"]
-        assert [m["id"] for m in inputs.selected_mcps] == ["context7"]
         assert inputs.profile == "individual"
 
     def test_org_profile_seed_hardens_enforcement_in_the_echo(self, monkeypatch, capsys):
@@ -132,7 +131,6 @@ class TestWizardSeeding:
         out = capsys.readouterr().out
         assert "Box profile" not in out
         assert inputs.agents == ["claude", "vscode"]
-        assert inputs.selected_mcps == []
         assert inputs.profile == "individual"
 
     def test_opened_groups_keep_box_seeds_as_their_defaults(self, monkeypatch, capsys):
@@ -154,7 +152,6 @@ class TestWizardSeeding:
             ),
         )
         assert inputs.agents == ["claude", "codex"]
-        assert [m["id"] for m in inputs.selected_mcps] == ["context7"]
         assert inputs.profile == "org"
 
     def test_all_unknown_harnesses_do_not_seed_but_are_reported(self, monkeypatch, capsys):

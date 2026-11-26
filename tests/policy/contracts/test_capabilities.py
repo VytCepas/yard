@@ -1,6 +1,6 @@
 """PI-374: the generated, surface-independent capabilities inventory (ADR-017).
 
-CAPABILITIES.md must accurately list skills/hooks/MCP + the chosen options,
+CAPABILITIES.md must accurately list skills/hooks + the chosen options,
 derive deterministically from the canonical sources, and stay in sync on
 re-scaffold.
 """
@@ -31,24 +31,24 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 
 def test_inventory_is_generated(tmp_path: Path):
-    t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7")
+    t = _scaffold(tmp_path / "p", agents="claude,codex")
     text = (t / _REL).read_text()
     assert text.startswith("# Capabilities")
     assert "do not edit" in text.lower()
-    for section in ("## Chosen options", "## Skills", "## Hooks", "## MCP servers"):
+    for section in ("## Chosen options", "## Skills", "## Hooks"):
         assert section in text
 
 
 def test_options_reflect_choices(tmp_path: Path):
-    t = _scaffold(tmp_path / "p", agents="claude,codex,cursor", installed_mcps="context7")
+    t = _scaffold(tmp_path / "p", agents="claude,codex,cursor")
     text = (t / _REL).read_text()
     assert "claude,codex,cursor" in text
-    assert "| MCP servers | context7 |" in text
+    assert "MCP servers" not in text
     assert "| Distribution | plugin |" in text
 
 
-def test_skills_and_hooks_and_mcp_listed(tmp_path: Path):
-    t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7")
+def test_skills_and_hooks_listed(tmp_path: Path):
+    t = _scaffold(tmp_path / "p", agents="claude,codex")
     text = (t / _REL).read_text()
     # Every canonical skill appears.
     for name, _ in capabilities.canonical_skills():
@@ -56,9 +56,6 @@ def test_skills_and_hooks_and_mcp_listed(tmp_path: Path):
     # The always-on hooks appear with their events.
     assert "| SessionStart | session-setup.sh |" in text
     assert "| UserPromptSubmit | workflow-state-reminder.sh |" in text
-    # The selected MCP server + its invocation.
-    # PI-842: a python-language scaffold's toolchain has no bun — npx.
-    assert "| context7 | npx @upstash/context7-mcp |" in text
 
 
 def test_base_skill_plan_is_listed(tmp_path: Path):
@@ -82,20 +79,12 @@ def test_no_gui_hooks_section_without_gui_surfaces(tmp_path: Path):
     assert "### GUI surface hooks" not in (t / _REL).read_text()
 
 
-def test_http_mcp_server_shows_url_invocation(tmp_path: Path):
-    # HTTP-transport servers (context7-http) carry a url instead of
-    # command+args — the Invocation cell must surface it, not render empty
-    # (2026-07 review; mirrors governance._server_transport).
-    t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7-http")
+def test_no_mcp_section_is_rendered(tmp_path: Path):
+    """No MCP servers ship (2026-11-26): the inventory has no MCP section."""
+    t = _scaffold(tmp_path / "p", agents="claude")
     text = (t / _REL).read_text()
-    assert "| context7-http | https://mcp.context7.com/mcp |" in text
-
-
-def test_mcp_section_empty_when_none(tmp_path: Path):
-    t = _scaffold(tmp_path / "p", agents="claude", installed_mcps="none")
-    text = (t / _REL).read_text()
-    assert "## MCP servers (0)" in text
-    assert "_None selected._" in text
+    assert "## MCP servers" not in text
+    assert "context7" not in text
 
 
 def test_inventory_matches_canonical_render_no_drift(tmp_path: Path):
@@ -106,20 +95,17 @@ def test_inventory_matches_canonical_render_no_drift(tmp_path: Path):
         codex="true",
         multi_agent="true",
         agents="claude,codex",
-        installed_mcps="context7",
     )
-    t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7")
+    t = _scaffold(tmp_path / "p", agents="claude,codex")
     assert (t / _REL).read_text() == capabilities.render(variables)
 
 
 def test_inventory_regenerated_on_rescaffold(tmp_path: Path):
     """A generated inventory is overwritten (kept current) on re-scaffold."""
-    t = _scaffold(tmp_path / "p", agents="claude", installed_mcps="none")
-    assert "## MCP servers (0)" in (t / _REL).read_text()
-    _scaffold(t, agents="claude", installed_mcps="context7")
-    text = (t / _REL).read_text()
-    assert "## MCP servers (1)" in text
-    assert "context7" in text
+    t = _scaffold(tmp_path / "p", agents="claude")
+    (t / _REL).write_text("# stale generated content\n")
+    _scaffold(t, agents="claude")
+    assert (t / _REL).read_text().startswith("# Capabilities")
 
 
 # --- #962: provenance column ------------------------------------------------

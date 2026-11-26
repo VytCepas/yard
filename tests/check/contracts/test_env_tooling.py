@@ -117,13 +117,12 @@ class TestVscodeOverlay:
 
     def test_gitignore_keeps_personal_vscode_ignored_by_default(self, tmp_path: Path):
         """Without --vscode, personal editor config (settings/extensions) stays
-        ignored. Only the shared, generated MCP config is unignored (PI-366) —
-        the .vscode/* glob form is required for that negation to work."""
+        ignored."""
         target = _scaffold(tmp_path / "p")
         gitignore = (target / ".gitignore").read_text()
         assert "\n.vscode/*\n" in gitignore
         # Personal editor files are NOT re-included by default.
         assert "!.vscode/settings.json" not in gitignore
         assert "!.vscode/extensions.json" not in gitignore
-        # The shared project MCP config is the only .vscode unignore.
-        assert "!.vscode/mcp.json" in gitignore
+        # No MCP config ships, so nothing in .vscode is unignored.
+        assert "!.vscode/mcp.json" not in gitignore

@@ -113,8 +113,6 @@ class TestAgentSelection:
         # the Prompt.ask iterator feeds it (not the gateway).
         monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"integrations"})
         monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(ask_answers))
-        monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
@@ -262,8 +260,10 @@ class TestSupportTierDocs:
         assert "Junie:" in agents_md
         # Each note names where its artifacts land.
         assert ".cursor/hooks.json" in agents_md
-        assert ".amp/settings.json" in agents_md
-        assert ".junie/mcp/mcp.json" in agents_md
+        assert ".junie/skills/" in agents_md
+        # No MCP config is generated (2026-11-26), so none is named.
+        assert ".amp/settings.json" not in agents_md
+        assert "mcp.json" not in agents_md
 
     def test_codex_hook_described_as_advisory(self, tmp_path: Path):
         """#430: codex 0.138.0 does not fire project-scoped hooks without an
@@ -286,8 +286,8 @@ class TestSupportTierDocs:
 
 
 class TestAmpJunieOverlay:
-    """PI-397: Amp and Junie ship a skills layer (MCP-file emission is covered in
-    tests/agent/unit/test_surfaces.py via planned_files)."""
+    """PI-397: Amp and Junie ship a skills layer (no MCP files; see
+    tests/agent/unit/test_surfaces.py)."""
 
     def test_amp_ships_agents_skills(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "amp")

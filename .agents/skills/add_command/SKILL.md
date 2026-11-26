@@ -13,8 +13,8 @@ Slash commands in this project live in `.claude/skills/<name>/SKILL.md`. Each sk
 ## Step 0 — Confirm the current schema (best-effort)
 
 The frontmatter fields below are a snapshot and can lag Claude Code releases.
-**If** a docs-lookup tool is available to you — the Context7 MCP, or WebFetch
-when it's permitted — confirm the field name / value against the current
+**If** a docs-lookup tool is available to you — WebFetch, when it's
+permitted — confirm the field name / value against the current
 reference (<https://docs.claude.com/en/docs/claude-code/slash-commands>) before
 relying on it. This skill's `allowed-tools` does not grant those tools, so skip
 this step cleanly whenever the tool is unavailable, unapproved, egress is

@@ -32,7 +32,6 @@ def test_enter_only_matches_the_pre_collapse_defaults(monkeypatch):
     assert inputs.project_name == "demo"
     assert inputs.project_description == "demo project"
     assert inputs.language == "none"
-    assert inputs.selected_mcps == []
     assert inputs.owner == ""
     assert inputs.license_choice == "none"
     assert inputs.devcontainer is False
@@ -68,8 +67,6 @@ def test_default_path_runs_no_group_chooser(monkeypatch):
         "_choose_delivery_interactive",
         "_choose_deploy_interactive",
         "_choose_iac_interactive",
-        "_choose_mcps_interactive",
-        "_choose_browser_interactive",
         "_choose_agents_interactive",
         "_choose_devcontainer_interactive",
         "_choose_mise_interactive",
@@ -131,7 +128,7 @@ def test_gateway_lists_pinned_flags(monkeypatch, capsys):
 
 def test_preview_echo_surfaces_the_security_resolution(monkeypatch, capsys):
     """The security surface is echoed, not silently defaulted (harbor J1):
-    enforcement, egress, lifecycle gate, MCP set, agent surfaces, governance —
+    enforcement, egress, lifecycle gate, agent surfaces, governance —
     shown BEFORE the gateway so accepting the standard setup is informed."""
     _enter_only(monkeypatch)
     out = capsys.readouterr().out
