@@ -142,7 +142,7 @@ selects a subset by number.
 2. `--preset obsidian-graphify --language node --no-plugin`
 3. `--preset governed --language python --governance --observability`
 4. `--preset obsidian-only --language go --delivery service --deploy cloud-run --iac opentofu`
-5. `--preset obsidian-only --language python --agents claude,codex,cursor,antigravity --multi-model --mcps context7 --browser`
+5. `--preset obsidian-only --language python --agents claude,codex,cursor,antigravity --multi-model`
 
 **+ 1 interactive smoke:** drive the *full* wizard prompt sequence via piped stdin (the real
 sequence in `main()` / the interactive gather path — **not** the leaf helpers in

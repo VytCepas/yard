@@ -937,6 +937,20 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
     did not exist when the project was scaffolded.
     """
     v = dict(variables)
+    # The scaffold ships no MCP servers (operator decision 2026-11-26), so a
+    # recorded selection (context7, playwright, ...) is not re-rendered: the
+    # generated MCP files drop out of the render and are reported as "no longer
+    # rendered (left in place)". config.yaml is user-owned, so the stale record
+    # stays there until its owner edits it.
+    recorded_mcps = v.get("installed_mcps", "none")
+    if recorded_mcps not in ("", "none"):
+        sys.stderr.write(
+            f"note: this project records MCP servers ({recorded_mcps}) that project-init "
+            "no longer ships; generated MCP config files are left in place, not removed "
+            "or updated.\n"
+        )
+    v["installed_mcps"] = "none"
+    v["installed_mcps_yaml"] = "[]"
     language = v.get("language", "none")
     # memory_stack itself postdates the earliest records (#466). When it is
     # absent, reconstruct it from the recorded gate flags rather than defaulting

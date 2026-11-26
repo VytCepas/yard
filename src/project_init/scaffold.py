@@ -334,7 +334,7 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 
 # Agents whose native wiring ships as a template layer (PI-137); ollama is
 # instructions-level only. Antigravity ships .agents/skills via this layer and its
-# hooks/MCP via surfaces.py (PI-386). Single source for scaffold + upgrade (PI-189).
+# hooks via surfaces.py (PI-386). Single source for scaffold + upgrade (PI-189).
 _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
@@ -1023,13 +1023,11 @@ def _apply_preset_vars(variables: dict[str, str], preset: dict[str, Any]) -> dic
 
 # Harness directory each non-Claude surface gets (surfaces.SURFACES / the
 # per-agent overlays). antigravity lives in `.agents/`, which always exists, and
-# ollama has no directory, so neither is listed.
+# ollama, amp and vscode generate no directory of their own, so none is listed.
 _SURFACE_DIRS = {
     "codex": ".codex/",
     "cursor": ".cursor/",
-    "amp": ".amp/",
     "junie": ".junie/",
-    "vscode": ".vscode/",
 }
 
 
@@ -1183,8 +1181,8 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
             shutil.rmtree(work_dir)
         raise
 
-    # Per-surface config generation (ADR-017 / PI-366): emit hooks + MCP for the
-    # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
+    # Per-surface config generation (ADR-017 / PI-366): emit hooks for the
+    # selected GUI surfaces from the canonical surface table. Runs
     # against the committed target (after _commit_staged in strict mode).
     created += _emit_generated_files(
         target, variables, conflicts, first_scaffold=first_scaffold, detect_root=detect_root
@@ -1207,25 +1205,15 @@ def _emit_generated_files(
     scaffold/upgrade so they cannot drift.
     """
     from project_init import capabilities, surfaces
-    from project_init.mcps import resolve_js_runner, servers_for_ids
 
     agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
-    mcp_raw = variables.get("installed_mcps", "none")
-    mcp_ids = (
-        [] if mcp_raw in ("", "none") else [s.strip() for s in mcp_raw.split(",") if s.strip()]
-    )
-    # Per-surface hooks/MCP for the selected GUI surfaces (ADR-017 / PI-366).
-    created = surfaces.emit(
-        target,
-        agents=agents,
-        servers=servers_for_ids(mcp_ids, js_runner=resolve_js_runner(variables)),
-        conflicts=conflicts,
-    )
+    # Per-surface hooks for the selected GUI surfaces (ADR-017 / PI-366).
+    created = surfaces.emit(target, agents=agents, conflicts=conflicts)
     # Surface-independent capabilities inventory (PI-374).
     created += capabilities.emit(
         target, variables, first_scaffold=first_scaffold, conflicts=conflicts
     )
-    # Governance AIBOM (ADR-018, #412): installed MCPs + detected CCR routes. The
+    # Governance AIBOM (ADR-018, #412): detected CCR routes. The
     # user-owned ai-declarations.md (seeded by the overlay copy, preserved via
     # config.yaml globs) is never touched here.
     if variables.get("governance"):

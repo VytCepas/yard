@@ -3,8 +3,7 @@
 > **This file is yours.** It is seeded once and then preserved — `project-init`
 > never overwrites or refreshes it on upgrade. Fill it in and keep it current.
 > It is the counterpart to the auto-generated [`ai-bom.generated.md`](ai-bom.generated.md):
-> that file lists what the scaffolder can *detect* (installed MCP servers,
-> CCR-routed models); this file records what only you know — the models and APIs
+> that file lists what the scaffolder can *detect* (CCR-routed models); this file records what only you know — the models and APIs
 > this system calls **directly** (e.g. a direct Anthropic/OpenAI SDK call), which
 > no config can reveal.
 >
@@ -28,6 +27,7 @@ PLACEHOLDER — list the models/APIs this system calls directly, e.g.:
 
 ## Notes
 
-- For MCP servers and CCR-routed models, see the generated
+- For CCR-routed models, see the generated
   [`ai-bom.generated.md`](ai-bom.generated.md) — don't duplicate them here.
+- Record any MCP server you add here: the scaffold ships none, so nothing detects them.
 - Update this file whenever you add or remove a directly-called model or API.

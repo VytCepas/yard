@@ -9,7 +9,7 @@ Model Context Protocol (MCP) servers extend Claude Code's toolset. Each server l
 
 ## Decision
 
-The following MCPs are intentionally absent — to reduce token overhead, and (for the DB MCPs) to avoid an unmaintained, CVE-prone dependency:
+No MCP is installed by default. These in particular are intentionally absent — to reduce token overhead, and (for the DB MCPs) to avoid an unmaintained, CVE-prone dependency:
 
 | MCP | Tokens saved | Replacement |
 |---|---|---|
@@ -20,15 +20,11 @@ The following MCPs are intentionally absent — to reduce token overhead, and (f
 
 The DB MCPs were removed in PI-387: the reference servers (`@modelcontextprotocol/server-postgres`, `mcp-server-sqlite`) were archived with unpatched SQL-injection CVEs, and a DB MCP overlaps with the agent's native shell access — the same rationale as Filesystem above. A project that wants structured, guard-railed DB access can add a maintained server (e.g. `@bytebase/dbhub`) itself.
 
-**Selected at init:** {{installed_mcps}}
-
-Retained MCPs:
-- **Context7** — targeted library doc lookups; no CLI equivalent. Default install is stdio (`bunx`). For Claude web/mobile/Cowork (HTTP MCP only — stdio servers are invisible there) select the `context7-http` catalog entry instead, which emits the hosted Streamable-HTTP endpoint `https://mcp.context7.com/mcp` (PI-397).
-- **Playwright** — browser automation; no CLI equivalent
+**No third-party MCP servers ship with this scaffold** (decided 2026-11-26): none are pinned and none are run resident. Docs lookup uses the docs the installed package ships or WebFetch; browser automation uses a pinned CLI, not an MCP server. A project that needs a server adds it itself, pinned, and records it in `.agents/governance/ai-declarations.md` when governance is on.
 
 ## Consequences
 
 - Agents use `gh issue list`, `gh pr create`, etc. for project management
 - File ops use Claude Code built-ins — no MCP config needed
 - Token budget stays ~3300 tokens lower per session; more context for actual work
-- `MCP_CATALOG` in project-init contains only context7 (plus the optional Playwright browser MCP)
+- project-init offers no MCP catalog, `--mcps` or `--browser`; the empty set is the decision, not an omission

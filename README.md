@@ -5,7 +5,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/project-init)](https://pypi.org/project/project-init/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Scaffolder for agentic-development infrastructure. One command drops a `.agents/` folder into any project so Claude Code (and other agents) have memory, docs, hooks, and curated MCPs ready to go.
+Scaffolder for agentic-development infrastructure. One command drops a `.agents/` folder into any project so Claude Code (and other agents) have memory, docs, hooks, and guards ready to go.
 
 **Who it's for** — solo devs and small teams running Claude Code seriously across multiple repos who want consistent agent infrastructure with a *real* boundary — git hooks and CI that bind every commit, an in-session git-lifecycle DAG guard that *steers* (advisory; ADR-007), memory, curated MCPs — not a hand-maintained `.agents/` per project.
 
@@ -104,7 +104,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 | Tier | What you get | Applies to |
 |---|---|---|
 | **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring. Claude Code reads its config from `.claude/`, which the scaffolder projects from the canonical `.agents/` tree — only the config surface Claude reads (settings/skills/commands/agents/rules, each rule's `globs:` rewritten as the `paths:` Claude Code scopes rules by), rebuilt each scaffold/upgrade so it never drifts, plain files so it restores identically on Linux, macOS and Windows. State (memory, ADRs) lives once in `.agents/` | Claude Code (CLI + the Anthropic VS Code extension) |
-| **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `example:.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `example:.amp/settings.json`, Junie `example:.junie/mcp/mcp.json`. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
+| **Generated per-surface config** | One canonical hook spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `example:.cursor/`, Antigravity `.agents/` (experimental). No MCP config is generated: the scaffold ships no MCP servers. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
 | **Instructions + portable** | `AGENTS.md` is canonical; `CLAUDE.md` redirects to it; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `example:.agents/scripts/install-hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
 ### Surface support matrix
@@ -112,17 +112,17 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 Which scaffolded config each surface actually reads (full detail + sources:
 [`docs/development/non-cli-surface-matrix.md`](docs/development/non-cli-surface-matrix.md)):
 
-| Surface | Instructions | Skills | Hooks | MCP | Local shell |
-|---|---|---|---|---|---|
-| Claude Code CLI / VS Code ext | `CLAUDE.md` | `.claude/skills` (mirror of `.agents/skills`) | `.claude/settings.json` (mirror of `.agents/settings.json`) | root `.mcp.json` | yes |
-| VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.agents/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
-| Cursor | `AGENTS.md` | `.agents/skills` | `example:.cursor/hooks.json` (best-effort) | `example:.cursor/mcp.json` | yes |
-| Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` (advisory) | `.codex/config.toml` | yes |
-| Antigravity (`agy`) | `AGENTS.md` | `.agents/skills` | `.agents/hooks.json` (experimental) | `.agents/mcp_config.json` | yes |
-| Amp | `AGENTS.md` | `.agents/skills` | — | `example:.amp/settings.json` (`amp.mcpServers`) | yes |
-| JetBrains Junie | `AGENTS.md` | `.junie/skills` | — | `example:.junie/mcp/mcp.json` | yes |
-| Ollama-based | `AGENTS.md` | — | — | — | yes |
-| ↳ *via `--multi-model`* | `CLAUDE.md` | `.claude/skills` | `.claude/settings.json` | root `.mcp.json` | yes |
+| Surface | Instructions | Skills | Hooks | Local shell |
+|---|---|---|---|---|
+| Claude Code CLI / VS Code ext | `CLAUDE.md` | `.claude/skills` (mirror of `.agents/skills`) | `.claude/settings.json` (mirror of `.agents/settings.json`) | yes |
+| VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.agents/skills` | Claude hooks (matchers ignored) | yes |
+| Cursor | `AGENTS.md` | `.agents/skills` | `example:.cursor/hooks.json` (best-effort) | yes |
+| Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` (advisory) | yes |
+| Antigravity (`agy`) | `AGENTS.md` | `.agents/skills` | `.agents/hooks.json` (experimental) | yes |
+| Amp | `AGENTS.md` | `.agents/skills` | — | yes |
+| JetBrains Junie | `AGENTS.md` | `.junie/skills` | — | yes |
+| Ollama-based | `AGENTS.md` | — | — | yes |
+| ↳ *via `--multi-model`* | `CLAUDE.md` | `.claude/skills` | `.claude/settings.json` | yes |
 
 `AGENTS.md` is the portability backbone (every surface reads it); `CLAUDE.md`
 rides alongside for Claude + VS Code. The generated `.agents/CAPABILITIES.md`
@@ -133,7 +133,7 @@ lists exactly what a given scaffold exposes, on any surface.
 The execution model — not the surface name — decides what binds:
 
 - **Local-execution surfaces** (Claude Desktop-local, VS Code, Codex IDE, Cursor,
-  Antigravity, Gemini Code Assist): bash hooks + git hooks + MCP stdio servers all
+  Antigravity, Gemini Code Assist): bash hooks + git hooks all
   run on your machine, so the enforcement layer is live (subject to the
   per-surface fidelity above — some drop hook matchers).
 - **Cloud-sandbox surfaces** (Claude web, Codex cloud, Jules): only
@@ -149,7 +149,7 @@ Two honest caveats hold across all of it:
   *asked* to follow the rules. The **git hooks + CI checks are the only
   enforcement that binds every surface** — that is the real boundary (ADR-007).
 - **Automated testing covers the Claude Code artifacts + the rendered per-surface
-  files.** The suite validates settings/skills/hooks/MCP and the generated
+  files.** The suite validates settings/skills/hooks and the generated
   surface configs; no GUI agent is driven live in CI.
 
 ## Use
@@ -162,7 +162,7 @@ After the **git install** (`install.sh`), a `/project-init` slash command is ava
 /project-init
 ```
 
-This runs the interactive wizard in the current project directory. The default path is **six questions** (ADR-029): preset, name, description, language, one **Customize?** gateway, and bootstrap — six for every language (the Python floor defaults to the supported minimum, is echoed in the preview, and is set with `--python-version` or under *Dev extras*). Every remaining concern (delivery, MCPs, memory ladder, lifecycle, governance, dev extras, …) resolves to its documented default, is annotated with its why/cost in a resolution preview shown *before* you accept, and is one gateway selection away when you want to shape it — each concern still explains itself before asking (ADR-023).
+This runs the interactive wizard in the current project directory. The default path is **six questions** (ADR-029): preset, name, description, language, one **Customize?** gateway, and bootstrap — six for every language (the Python floor defaults to the supported minimum, is echoed in the preview, and is set with `--python-version` or under *Dev extras*). Every remaining concern (delivery, memory ladder, lifecycle, governance, dev extras, …) resolves to its documented default, is annotated with its why/cost in a resolution preview shown *before* you accept, and is one gateway selection away when you want to shape it — each concern still explains itself before asking (ADR-023).
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
 
@@ -176,8 +176,7 @@ uvx --from ~/.local/share/project-init project-init . \
   --preset obsidian-only \
   --name my-app \
   --description "an app" \
-  --language python \
-  --mcps context7
+  --language python
 ```
 
 ### Pick the scaffold weight by use-case
@@ -200,7 +199,7 @@ You can add any declined concern later (see
 
 The wizard's concerns (interactive: the identity questions up front, the rest grouped behind the Customize gateway per ADR-029 — a flag always pins its concern and skips the prompt):
 
-> **Box profile (optional):** a machine-local `~/.claude/box-profile.toml` (override: `PROJECT_INIT_BOX_PROFILE`) may seed the *defaults* for agent surfaces, the MCP selection, and the distribution profile — advisory only, every seed changeable, flags always win, and an absent/invalid file changes nothing. The file's format is a **frozen v1 contract owned by whatever ambient agent layer writes it**, not by this project; `project-init` only reads it, and reads it advisorily.
+> **Box profile (optional):** a machine-local `~/.claude/box-profile.toml` (override: `PROJECT_INIT_BOX_PROFILE`) may seed the *defaults* for agent surfaces and the distribution profile — advisory only, every seed changeable, flags always win, and an absent/invalid file changes nothing. The file's format is a **frozen v1 contract owned by whatever ambient agent layer writes it**, not by this project; `project-init` only reads it, and reads it advisorily.
 
 - Project name / description
 - Language (Python/Node/Go/Rust/none) — drives `lint_command`, `format_command`, `test_command`
@@ -208,18 +207,17 @@ The wizard's concerns (interactive: the identity questions up front, the rest gr
 - Deploy overlay (`--deploy none|cloud-run|fly|k8s|registry|custom`; identity via `--deploy-app` (default: project slug), `--deploy-region` (default: us-central1), `--deploy-health-url` (default: none) — captured interactively in the delivery group, rendered into the descriptor deploy block the orchestrator dispatches on) — opt-in, **service only**. Container targets scaffold a build-once-**by-digest** `deploy.yml` (GitHub Environments: staging auto-deploys, production is **gated**) + a declarative `example:deploy/environments.yaml`, plus `setup-environment-protection.sh` (server-side prod gate, tiered by profile) and `what-is-deployed.sh`. `none` (default) = your platform (Vercel/Render/Fly/…) owns deploy.
 - Infrastructure-as-Code (`--iac none|opentofu`) — opt-in OpenTofu/HCL skeleton under `example:infrastructure/` + a plan-on-PR workflow (apply is **manual / environment-gated**, never apply-on-merge). Emits structure only — no resources or credentials.
 - Multi-model switching (`--multi-model`) — opt-in overlay (ADR-016) that scaffolds a [claude-code-router](https://github.com/musistudio/claude-code-router) config + a `setup_models.sh` installer, so you can run DeepSeek/Kimi/Ollama **through the Claude Code harness** with live `/model` switching and background **cost-routing** — your hooks, CI gates, and standards stay identical (they run below the model). OpenAI/Codex is better in its native `--agents` harness. CCR is **pinned**, machine-level, and the scaffolder never runs it (ADR-001). Clean by default.
-- AI governance (`--governance`) — opt-in overlay (ADR-018) that ships **governance-as-code** for projects that build or operate an AI system: a **policy layer** (AI usage policy, approved-tools / data-handling / code-provenance docs, NIST RMF crosswalk), a **system card** template carrying a flat-scalar governance manifest, a two-file **AIBOM** (generated MCP + detected-CCR-route inventory, plus a user-owned declarations file), and a **CI gate** that validates every real system card (required fields, allowed values, the `prohibited`+`allowed:true` illegal combo, declarations completeness, `last_reviewed` staleness) — failing the build, not producing a PDF. Adopts NIST AI RMF / ISO 42001 / EU AI Act / OWASP conventions (referenced, not re-authored). The gate never passes on silence: a freshly scaffolded project ships only an example and templates, so CI stays red until the team either writes a real system card or declares, with a reason and a date in `.agents/governance/NO_AI_SYSTEM.md`, that the repo ships no AI system (both together is a contradiction and fails). Most projects are not AI products — strictly opt-in, off by default. The `governed` preset enables it.
+- AI governance (`--governance`) — opt-in overlay (ADR-018) that ships **governance-as-code** for projects that build or operate an AI system: a **policy layer** (AI usage policy, approved-tools / data-handling / code-provenance docs, NIST RMF crosswalk), a **system card** template carrying a flat-scalar governance manifest, a two-file **AIBOM** (generated detected-CCR-route inventory, plus a user-owned declarations file), and a **CI gate** that validates every real system card (required fields, allowed values, the `prohibited`+`allowed:true` illegal combo, declarations completeness, `last_reviewed` staleness) — failing the build, not producing a PDF. Adopts NIST AI RMF / ISO 42001 / EU AI Act / OWASP conventions (referenced, not re-authored). The gate never passes on silence: a freshly scaffolded project ships only an example and templates, so CI stays red until the team either writes a real system card or declares, with a reason and a date in `.agents/governance/NO_AI_SYSTEM.md`, that the repo ships no AI system (both together is a contradiction and fails). Most projects are not AI products — strictly opt-in, off by default. The `governed` preset enables it.
 - Observability (`--observability`) — opt-in overlay (ADR-019) that scaffolds a **file-based usage report**: a stdlib analyzer over the Claude Code transcript JSONL plus a guarded, stdin-safe hook self-log, rendered to an HTML report with one command. **No Docker, no OTEL, no egress** — everything stays on disk. Lets you see what your agents actually do (tokens, tool calls, activity) without a telemetry backend. Strictly opt-in, off by default.
 - Memory backend (`--memory none|auto|obsidian-only|obsidian-graphify|obsidian-graphify-rag`; `obsidian` is accepted as an alias for `obsidian-only`) — a **superset ladder** (ADR-024): **none** (vault-free; the `core` preset), **auto** (flat agent-memory files in `.agents/memory/`, no vault — pure files, installs nothing), **Obsidian-only** (auto **plus** a human markdown vault), **Obsidian + Graphify** (obsidian **plus** a derived code knowledge graph; recommended for code-heavy projects), or **+ RAG** (`obsidian-graphify-rag`, tier 3 — a semantic recall *seam*: docs + a user-run `setup-rag.sh` stub + the `rag_endpoint` descriptor, **engine not bundled**; worth it only at multi-project/monorepo scale, parked in #495). Each rung adds a retrieval surface without relocating the anchors. The flag overrides the preset's default; the wizard explains each backend and its install cost before asking (#466, #497, ADR-024).
 - GitHub lifecycle (`--lifecycle github|none`) — **github** (default) ships the issue → branch → PR → review → merge automation: DAG guard hooks, lifecycle scripts (`start-issue`/`finish-pr`/…), board/PR-validation workflows, issue/PR templates, the `create-issue`/`start-task`/`github-workflow` skills, and — in plugin mode — the `project-init-lifecycle` plugin. **none** declines it for a forge-agnostic or minimalist scaffold (the `core` preset's audience). The forge-portable quality hooks (commit-msg, gitleaks secret scan, lint/format gate, prod-safety) stay either way. The flag overrides the preset's default; the wizard explains it before asking (#476, ADR-021).
-- Core MCPs (Context7, stdio or hosted-HTTP) — database MCPs are intentionally not offered: the reference Postgres/SQLite servers were archived upstream with unpatched CVEs (PI-387); use the agent's native `psql`/`sqlite3` access instead
-- Browser automation — Playwright (yes/no)
+- MCP servers — none are shipped or offered (decided 2026-11-26): unpinned/resident MCP servers fail the vendoring standard, and browser automation belongs to a pinned CLI rather than an MCP server. `--mcps` and `--browser` are removed and fail with a message naming this decision; a project that needs an MCP server adds its own, pinned. Existing projects: `upgrade` leaves any generated MCP config (e.g. `.mcp.json`) in place and reports it as no longer rendered.
 - Distribution profile (`--profile individual|standalone|org`) — how the project receives project-init updates and how strictly rules are enforced (ADR-013): **individual** (default — plugin-first, updates tracked from upstream, advisory enforcement), **standalone** (everything copied into the repo, no plugin dependency, you apply updates), **org** (your organization's fork is the source of truth, server-side enforcement). Org mode can add `--no-egress` to omit the external official plugin marketplace from scaffolded settings (#258)
 - Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
 - No-plugin fallback (`--no-plugin`) — copies the shared hooks/skills into `.agents/` and wires them in `settings.json` instead of relying on the `project-init-workflow` plugin (offline / no-trust environments)
 - Devcontainer (`--devcontainer`) — renders `example:.devcontainer/` for Codespaces, fresh clones, and remote agent containers (see below)
-- Agents & surfaces (`--agents claude,codex,ollama,cursor,antigravity,vscode,amp,junie`) — which agents/editors the project supports; default `claude`. **Amp** and **JetBrains Junie** get a skills layer plus generated MCP config (`example:.amp/settings.json` key `amp.mcpServers`; `example:.junie/mcp/mcp.json`). Selecting the `context7-http` MCP emits an HTTP/streamable entry (`type: http`) — the transport that works on Claude web/mobile/Cowork, where stdio servers are invisible. Codex gets the shared skills at `.agents/skills/` plus the command guard wired via `.codex/hooks.json` (advisory — codex 0.138.0 may not fire project hooks without an enable step); **Antigravity** (`agy`, Google's CLI/IDE) gets the shared skills at `.agents/skills/`, the command guard via `.agents/hooks.json` (experimental), and project MCP at `.agents/mcp_config.json`; Ollama-based agents get the portable `AGENTS.md` contract (plus git-level enforcement) as a standalone surface — Ollama is a model server with no universal client-side hook/skill/MCP config to wire. To run other models with the **full** hooks/skills/MCP harness, use `--multi-model` (CCR), which routes them **through the Claude Code harness** so your standards run below the model — whether local (Ollama-served, e.g. `qwen3-coder`) or cloud (DeepSeek, Kimi). Model tool-calling quality varies, so pick one suited to agentic use. (Gemini CLI was removed in PI-386 — Google sunset its free/Pro/Ultra tiers on 2026-06-18; Antigravity, which reads the same `.agents/` tree, is the Google target.) Other GUI surfaces get generated per-surface config from one canonical source (ADR-017): **Cursor** → `example:.cursor/hooks.json` + `example:.cursor/mcp.json`, **VS Code** → `.vscode/mcp.json`; selecting any MCP also emits a root `.mcp.json` (Claude's shareable project scope) and `.codex/config.toml` when Codex is on. Skills are read natively by all of these. Agent hooks (incl. the Codex CLI) are best-effort/fail-open (their exact blocking I/O wasn't live-verified — e.g. codex 0.138.0 may not fire project hooks without an enable step); git hooks + CI remain the only enforcement that binds every surface. Only the Claude path is functionally CI-tested — overlays are contract-tested on the rendered files
+- Agents & surfaces (`--agents claude,codex,ollama,cursor,antigravity,vscode,amp,junie`) — which agents/editors the project supports; default `claude`. **Amp** and **JetBrains Junie** get a skills layer. Codex gets the shared skills at `.agents/skills/` plus the command guard wired via `.codex/hooks.json` (advisory — codex 0.138.0 may not fire project hooks without an enable step); **Antigravity** (`agy`, Google's CLI/IDE) gets the shared skills at `.agents/skills/`, and the command guard via `.agents/hooks.json` (experimental); Ollama-based agents get the portable `AGENTS.md` contract (plus git-level enforcement) as a standalone surface — Ollama is a model server with no universal client-side hook/skill config to wire. To run other models with the **full** hooks/skills harness, use `--multi-model` (CCR), which routes them **through the Claude Code harness** so your standards run below the model — whether local (Ollama-served, e.g. `qwen3-coder`) or cloud (DeepSeek, Kimi). Model tool-calling quality varies, so pick one suited to agentic use. (Gemini CLI was removed in PI-386 — Google sunset its free/Pro/Ultra tiers on 2026-06-18; Antigravity, which reads the same `.agents/` tree, is the Google target.) Other GUI surfaces get generated per-surface config from one canonical source (ADR-017): **Cursor** → `example:.cursor/hooks.json`; **VS Code** generates nothing extra (the Claude extension reads `.claude/`). Skills are read natively by all of these. Agent hooks (incl. the Codex CLI) are best-effort/fail-open (their exact blocking I/O wasn't live-verified — e.g. codex 0.138.0 may not fire project hooks without an enable step); git hooks + CI remain the only enforcement that binds every surface. Only the Claude path is functionally CI-tested — overlays are contract-tested on the rendered files
 - Toolchain pinning (`--mise`) — renders `mise.toml` pinning runtime/tool versions. Ownership rule: mise owns versions only; uv/bun own dependencies, just owns commands, `.env` owns environment
 - Docs tooling (`--no-docs`) — by default a python project gets `mkdocs.yml` and a node project gets `typedoc.json` (local-preview configs — there is no publish workflow; ADR-022/PI-343). `--no-docs` declines them; the wizard asks per language (#477)
 - Renovate (`--no-renovate`) — `renovate.json` (the Renovate dependency-update bot config) ships by default; `--no-renovate` declines it if you use a different update mechanism (#477, ADR-022)
@@ -265,13 +263,13 @@ Scaffolded projects bootstrap themselves in ephemeral environments
 
 ## Example command
 
-Scaffold an Obsidian-only Python project with Context7 MCP:
+Scaffold an Obsidian-only Python project:
 
 ```bash
 uvx --from ~/.local/share/project-init project-init /path/to/my-project \
   --non-interactive \
   --preset obsidian-only --name example --description "example python project" \
-  --language python --mcps context7
+  --language python
 ```
 
 The test suite validates this command works correctly — see `TestREADMEExampleCommand` in `tests/doc/integration/test_readme_examples.py`.
@@ -497,12 +495,6 @@ A shell template arrived with CRLF line endings. The repo enforces LF via `.gita
 **`uv: command not found` after install**
 The installer adds `~/.local/bin` to PATH for the current process only. Add it to your shell profile: `export PATH="$HOME/.local/bin:$PATH"` in `~/.bashrc` / `~/.zshrc`.
 
-**`claude mcp add` fails with `command not found: bunx`**
-The MCP catalog uses [bun](https://bun.sh) instead of npm/npx. Install it once:
-```bash
-curl -fsSL https://bun.sh/install | bash
-```
-
 **Hooks silently do nothing on commit**
 The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They auto-detect `uv run ruff` for uv-managed Python projects and fall back to a system `ruff`.
 
@@ -560,7 +552,7 @@ four-category comparison and the moat, see
 project-init/
 ├── pyproject.toml              # uv-managed, rich-only runtime dep, ruff-only dev
 ├── install.sh                  # bootstrap one-liner
-├── src/project_init/           # wizard CLI + scaffold engine (scaffold, concerns, surfaces, mcps, …)
+├── src/project_init/           # wizard CLI + scaffold engine (scaffold, concerns, surfaces, …)
 ├── templates/
 │   ├── base/                   # always copied
 │   ├── fallback/               # shared hooks/skills — rendered only with --no-plugin (ADR-010)

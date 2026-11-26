@@ -107,15 +107,6 @@ Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
 - `def carries` — Hold ``target`` to its kind's list with the vendored standard-kit.sh (offline). Returns (ok, output).
 - `def run_new` — `project-init new <target> --kind <repo-kind>`.
 
-### `project_init/mcps.py`
-
-MCP catalog and emit helpers for the project-init wizard.
-
-- `def resolve_js_runner` — The JS package runner the scaffolded toolchain actually has (#842).
-- `def servers_for_ids` — Canonical MCP server specs for the given catalog ids.
-- `def format_installed_mcps` — Human-readable comma-separated list for template substitution.
-- `def format_installed_mcps_yaml` — Inline YAML list string for config.yaml template.
-
 ### `project_init/migration_notes.py`
 
 Curated per-version upgrade notes surfaced by `project-init upgrade` (#244).
@@ -191,13 +182,8 @@ project-init subcommands: upgrade / add / remove / preset / doctor.
 
 Per-surface agent-config generation (ADR-017, PI-366).
 
-- `def mcp_server_specs` — Canonical {name: {command,args}|{url}} from selected catalog entries.
-- `def render_mcp_json` — MCP config as JSON.
-- `def render_antigravity_mcp` — MCP config for Antigravity's ``.agents/mcp_config.json``.
-- `def render_mcp_toml` — MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
 - `def render_cursor_hooks` — Render `.cursor/hooks.json` (version 1).
 - `def render_antigravity_hooks` — Render `.agents/hooks.json` for Antigravity's ``safety-gate`` model.
-- `def render_mcp_for` — Render MCP config for a ``(format, key[, drop_type])`` spec.
 - `def surface_files` — All files to write for a selected *surface*: {relpath: content}.
 - `def planned_files` — Map a selection to ``{relpath: content}``.
 - `def emit` — Write the per-surface config files into *target*.

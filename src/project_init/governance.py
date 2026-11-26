@@ -1,8 +1,7 @@
 """Deterministic AIBOM generation for the governance overlay (ADR-018, #412).
 
 Emits ``.agents/governance/ai-bom.generated.md`` — an AI Bill of Materials the
-scaffolder can *derive*: the installed MCP servers (from the MCP catalog over the
-recorded selection) and the models CCR is configured to route to (from the
+scaffolder can *derive*: the models CCR is configured to route to (from the
 ``multi_model`` overlay's ``config.json``, when present), labelled "detected CCR
 routes". No LLM (ADR-001); regenerated on every scaffold/upgrade so it never
 drifts, exactly like ``capabilities.emit`` (it is "always (over)written").
@@ -19,8 +18,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP, resolve_js_runner, servers_for_ids
-
 _OUTPUT_REL = Path(".agents/governance/ai-bom.generated.md")
 _CCR_CONFIG_REL = Path(".agents/multi-model/config.json")
 
@@ -29,22 +26,6 @@ _GENERATED_HEADER = (
     "is overwritten on every scaffold/upgrade. Hand-declared models/APIs belong "
     "in ai-declarations.md. -->"
 )
-
-
-def _mcp_ids(variables: dict[str, str]) -> list[str]:
-    raw = variables.get("installed_mcps", "none")
-    if raw in ("", "none"):
-        return []
-    return [s.strip() for s in raw.split(",") if s.strip()]
-
-
-def _server_transport(spec: dict[str, Any]) -> str:
-    """One-line transport description for an MCP server spec."""
-    if spec.get("type") == "http" or spec.get("url"):
-        return f"http: {spec.get('url', '')}".strip()
-    cmd = spec.get("command", "")
-    args = " ".join(spec.get("args", []) or [])
-    return f"stdio: {cmd} {args}".strip()
 
 
 def extract_ccr_routes(config_path: Path) -> dict[str, list[Any]]:
@@ -83,10 +64,6 @@ def render_aibom(detect_root: Path, variables: dict[str, str]) -> str:
     template ``config.json``, so detecting there would report template-default
     routes and clobber the user's actual ones on ``--apply``.
     """
-    by_id = {m["id"]: m for m in MCP_CATALOG}
-    by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
-    servers = servers_for_ids(_mcp_ids(variables), js_runner=resolve_js_runner(variables))
-
     lines: list[str] = [
         _GENERATED_HEADER,
         "",
@@ -96,16 +73,11 @@ def render_aibom(detect_root: Path, variables: dict[str, str]) -> str:
         "Models and APIs called directly (which no config reveals) are recorded "
         "by hand in [`ai-declarations.md`](ai-declarations.md).",
         "",
-        "## MCP servers (installed)",
+        "## MCP servers",
         "",
+        "_`project-init` ships no MCP servers. Record any you add in "
+        "[`ai-declarations.md`](ai-declarations.md)._",
     ]
-    if servers:
-        lines += ["| ID | Name | Transport |", "|---|---|---|"]
-        for mcp_id, spec in sorted(servers.items()):
-            name = by_id.get(mcp_id, {}).get("name", mcp_id)
-            lines.append(f"| `{mcp_id}` | {name} | {_server_transport(spec)} |")
-    else:
-        lines.append("_None installed._")
     lines += ["", "## Detected CCR routes", ""]
 
     if variables.get("multi_model"):

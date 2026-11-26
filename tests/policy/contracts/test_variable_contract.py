@@ -50,7 +50,6 @@ def _full_build_vars() -> dict[str, str]:
         project_name="p",
         project_description="d",
         language="python",
-        selected_mcps=[],
         owner="",
         license_choice="none",
         devcontainer=False,

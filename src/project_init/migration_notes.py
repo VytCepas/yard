@@ -38,7 +38,11 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "baseline across the moves. Two agent rules join AGENTS.md, 'Reuse "
             "before you write' and 'Read the docs for the installed version', and "
             "`validate-pr` now holds a ready (non-draft) PR to a filled `Reuse:` "
-            "line and a filled `Docs:` line in its body."
+            "line and a filled `Docs:` line in its body. The scaffold no longer ships "
+            "any third-party MCP server: Context7 and Playwright are gone, along with "
+            "`--mcps` and `--browser` (both now fail with a message naming the "
+            "decision) and every generated MCP config file (`.mcp.json` and the "
+            "per-editor equivalents)."
         ),
         "action_required": (
             "Only repos with governance enabled and no real SYSTEM_CARD.md: after "
@@ -61,7 +65,11 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "open ready PR goes red on `validate-pr` until its body carries "
             "`Reuse: none` (or what was hand-built, the library rejected and why) and "
             "`Docs: <what was read>` (or `n/a`); editing the body re-runs the check. "
-            "Drafts are not checked."
+            "Drafts are not checked. Projects that already carry a generated MCP "
+            "config (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, "
+            "`.codex/config.toml`, `.agents/mcp_config.json`): `upgrade` leaves "
+            "those files untouched and lists them as no longer rendered; delete "
+            "them by hand if the servers are not wanted, or keep them."
         ),
     },
     "1.2.2": {

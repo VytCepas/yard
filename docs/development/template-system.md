@@ -81,8 +81,8 @@ Strict mode renders all scaffold files into a temporary directory first. If vali
 | `project_init_url` | Package constant | `https://github.com/VytCepas/project-init` |
 | `language` | Wizard prompt | `python` |
 | `memory_stack` | Preset `vars.memory_stack` | `obsidian-only` |
-| `installed_mcps` | Selected MCPs (formatted) | `context7` |
-| `installed_mcps_yaml` | Selected MCPs (YAML list) | `["context7"]` |
+| `installed_mcps` | Always `none` — no MCP servers ship (2026-11-26) | `none` |
+| `installed_mcps_yaml` | Always `[]` (the descriptor's `mcps.installed` record) | `[]` |
 | `lint_command` | Derived from language | `uv run ruff check .` |
 | `format_command` | Derived from language | `uv run ruff format .` |
 | `test_command` | Derived from language | `uv run pytest` |

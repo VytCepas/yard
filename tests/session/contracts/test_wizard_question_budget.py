@@ -239,7 +239,6 @@ def test_the_security_surface_is_echoed_before_the_gateway(monkeypatch, tmp_path
         # The first line of each security-surface row (long cells wrap).
         "profile /",
         "lifecycle /",
-        "MCP servers",
         "agent surfaces",
         "governance /",
         "marketplace egress",

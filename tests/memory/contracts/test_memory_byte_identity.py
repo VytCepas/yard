@@ -223,6 +223,14 @@ save-memory skill name notes `<type>-<slug>.md`; skills/README.md links the
 renamed index.md and the audit skill names it; graphify_post_install.py
 recognises the guard under both names. `install_hooks.sh` is a new shim (see
 _ADDED_SINCE_BASELINE).
+
+Exception (no MCP servers, 2026-11-26): the scaffold stopped shipping any MCP
+server, so the MCP decision record, the testing guide's browser wording, the
+developer-onboarding agent table, the `.gitignore` (no `.vscode/mcp.json`
+unignore) and, in the no-plugin combos, the `add-hook` skill (no Context7
+mention) changed. Deliberate content change, not move-drift. Only those keys
+were re-pinned, in all four fixtures, by a re-pin that refused to write if any
+other key had drifted.
 """
 
 from __future__ import annotations

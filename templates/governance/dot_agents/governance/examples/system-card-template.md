@@ -66,7 +66,7 @@ last_reviewed: <REPLACE: YYYY-MM-DD>
 ## Declared models / APIs
 
 See [`ai-declarations.md`](../ai-declarations.md) (the gate checks it is filled
-in). Installed MCP servers + detected CCR routes are in
+in). Detected CCR routes are in
 [`ai-bom.generated.md`](../ai-bom.generated.md).
 
 ## Standards mapping (adopted reference — dated, not gate logic)
