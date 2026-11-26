@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 
 from project_init import capabilities, governance, surfaces
-from project_init.mcps import servers_for_ids
 from project_init.scaffold import load_preset, read_preserve_globs, scaffold
 from project_init.upgrade import _is_sibling, write_scaffold_record
 from tests.helpers import make_variables
@@ -23,7 +22,7 @@ def test_surface_emit_non_utf8_existing_file_does_not_crash(tmp_path: Path):
     with UnicodeDecodeError — it differs from the render, so it is preserved and
     the render lands as a .new sibling."""
     target = tmp_path / "p"
-    dest = target / ".cursor" / "mcp.json"
+    dest = target / ".cursor" / "hooks.json"
     dest.parent.mkdir(parents=True)
     dest.write_bytes(b"\xff\xfe not utf-8 at all \x80")
 
@@ -31,43 +30,41 @@ def test_surface_emit_non_utf8_existing_file_does_not_crash(tmp_path: Path):
     surfaces.emit(
         target,
         agents=["claude", "cursor"],
-        servers=servers_for_ids(["context7"]),
         conflicts=conflicts,
     )
 
     assert dest.read_bytes() == b"\xff\xfe not utf-8 at all \x80"  # untouched
-    sibling = target / ".cursor" / "mcp.json.new"
+    sibling = target / ".cursor" / "hooks.json.new"
     assert sibling.is_file()
-    assert (Path(".cursor/mcp.json"), Path(".cursor/mcp.json.new")) in conflicts
+    assert (Path(".cursor/hooks.json"), Path(".cursor/hooks.json.new")) in conflicts
 
 
 def test_surface_emit_crlf_existing_file_is_not_seen_as_identical(tmp_path: Path):
     """A CRLF copy of the canonical render must register as *different* (byte
     comparison) rather than read-normalize to "identical" and silently drift."""
     target = tmp_path / "p"
-    servers = servers_for_ids(["context7"])
-    canonical = surfaces.planned_files(["claude", "cursor"], servers)[".cursor/mcp.json"]
+    canonical = surfaces.planned_files(["claude", "cursor"])[".cursor/hooks.json"]
 
-    dest = target / ".cursor" / "mcp.json"
+    dest = target / ".cursor" / "hooks.json"
     dest.parent.mkdir(parents=True)
     dest.write_bytes(canonical.replace("\n", "\r\n").encode("utf-8"))  # CRLF on disk
 
     conflicts: list[tuple[Path, Path]] = []
-    surfaces.emit(target, agents=["claude", "cursor"], servers=servers, conflicts=conflicts)
+    surfaces.emit(target, agents=["claude", "cursor"], conflicts=conflicts)
 
     # The CRLF file is preserved and the LF render is surfaced for review,
     # instead of being left silently divergent from the manifest.
     assert b"\r\n" in dest.read_bytes()
-    assert (target / ".cursor" / "mcp.json.new").is_file()
+    assert (target / ".cursor" / "hooks.json.new").is_file()
 
 
 # --- .new siblings excluded from the manifest (C5) -----------------------------
 
 
 def test_is_sibling_recognizes_new_suffixes():
-    assert _is_sibling(Path(".cursor/mcp.json.new"))
+    assert _is_sibling(Path(".cursor/hooks.json.new"))
     assert _is_sibling(Path("a/b.json.new.3"))
-    assert not _is_sibling(Path(".cursor/mcp.json"))
+    assert not _is_sibling(Path(".cursor/hooks.json"))
     assert not _is_sibling(Path("code-map.md"))
 
 
@@ -81,8 +78,8 @@ def test_new_siblings_not_recorded_in_manifest(tmp_path: Path):
     cfg.write_text("project_init_version: 0.0.0\n")
 
     created = [
-        Path(".cursor/mcp.json"),
-        Path(".cursor/mcp.json.new"),  # sibling — must be filtered out
+        Path(".cursor/hooks.json"),
+        Path(".cursor/hooks.json.new"),  # sibling — must be filtered out
     ]
     for rel in created:
         f = target / rel
@@ -93,8 +90,8 @@ def test_new_siblings_not_recorded_in_manifest(tmp_path: Path):
     text = cfg.read_text()
     marker_idx = text.index("manifest:")
     manifest = json.loads(text[marker_idx:].split("manifest:", 1)[1].strip())
-    assert ".cursor/mcp.json" in manifest
-    assert ".cursor/mcp.json.new" not in manifest
+    assert ".cursor/hooks.json" in manifest
+    assert ".cursor/hooks.json.new" not in manifest
 
 
 # --- read_preserve_globs tolerates a non-UTF-8 config.yaml (C6) ----------------

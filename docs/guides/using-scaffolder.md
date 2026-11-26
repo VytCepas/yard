@@ -41,8 +41,7 @@ uvx --from ~/.local/share/project-init project-init . \
   --preset obsidian-only \
   --name my-app \
   --description "A short description" \
-  --language python \
-  --mcps context7
+  --language python
 ```
 
 The most-used flags:
@@ -55,8 +54,6 @@ The most-used flags:
 | `--memory` | `none`, `auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag` | the preset's tier |
 | `--lifecycle` | `github`, `none` | `github` |
 | `--review-cycles` | `0` (no review control), `1`, `2`, … | `2` (requires `--lifecycle github`) |
-| `--mcps` | `context7`, `context7-http` (comma-separated) | none |
-| `--browser` | flag (Playwright MCP) | off |
 | `--strict` | flag (fail on unrendered placeholders) | off |
 
 A **review cycle** is one pass of the merge gate: push → the review agents comment

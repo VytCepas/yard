@@ -832,7 +832,6 @@ class TestInteractiveNoPlugin:
                 project_name="proj",
                 project_description="desc",
                 language="python",
-                selected_mcps=[],
                 owner="",
                 license_choice="none",
                 devcontainer=False,

@@ -23,6 +23,20 @@ from project_init.variables import (
     deploy_identity_error,
 )
 
+_MCP_RETIRED = (
+    "the scaffold ships no third-party MCP servers (operator decision 2026-11-26): "
+    "the vendoring standard refuses MCP servers referenced unpinned or run resident, "
+    "and browser automation belongs to a pinned CLI, not an MCP server. Remove the "
+    "flag; a project that needs an MCP server can add its own."
+)
+
+
+def _reject_retired_mcp_flags(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Fail loudly on --mcps / --browser, which no longer select anything."""
+    used = [f for f, v in (("--mcps", args.mcps is not None), ("--browser", args.browser)) if v]
+    if used:
+        parser.error(f"{' and '.join(used)} removed: {_MCP_RETIRED}")
+
 
 def _reject_python_version_without_python(
     flag: str | None, language: str | None, parser: argparse.ArgumentParser
@@ -261,16 +275,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "comments. Requires the GitHub lifecycle."
         ),
     )
-    p.add_argument(
-        "--mcps",
-        default="",
-        help="Comma-separated MCP IDs from the core catalog (e.g. context7)",
-    )
-    p.add_argument(
-        "--browser",
-        action="store_true",
-        help="Add Playwright browser-automation MCP",
-    )
+    # Retired (operator decision 2026-11-26): the scaffold ships no third-party
+    # MCP servers. Still parsed — hidden from --help — only so
+    # _reject_retired_mcp_flags can fail loudly instead of argparse's generic
+    # "unrecognized arguments"; a silent accept would hide a stale caller.
+    p.add_argument("--mcps", default=None, help=argparse.SUPPRESS)
+    p.add_argument("--browser", action="store_true", help=argparse.SUPPRESS)
     p.add_argument(
         "--license",
         choices=["mit", "apache-2.0", "proprietary", "none"],
@@ -297,10 +307,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Comma-separated agents/surfaces the project supports: claude "
             "(always included), codex, ollama, cursor, antigravity, vscode, amp, "
             "junie. Codex gets a native overlay; antigravity gets an .agents/ "
-            "skills layer + generated hooks/MCP; cursor gets generated hooks+MCP; "
-            "amp/junie get a skills layer + generated MCP config; vscode gets MCP "
-            "config; ollama gets the portable AGENTS.md contract as a standalone "
-            "surface (to run models with the full hooks/skills/MCP harness — "
+            "skills layer + generated hooks; cursor gets generated hooks; "
+            "amp/junie get a skills layer; vscode generates nothing extra (the "
+            "Claude extension reads .claude/); ollama gets the portable AGENTS.md "
+            "contract as a standalone surface (to run models with the full "
+            "hooks/skills harness — "
             "local ones via Ollama, or cloud ones like DeepSeek/Kimi — route them "
             "through Claude Code with --multi-model) (PI-137, PI-366, PI-386, "
             "PI-397; antigravity hooks experimental)"
@@ -444,7 +455,6 @@ WIZARD_CONCERN_FLAGS: dict[str, str] = {
     "renovate": "no_renovate",
     "coauthor": "no_coauthor",
     "bootstrap": "bootstrap",
-    "browser": "browser",
 }
 
 
@@ -462,7 +472,8 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
         "deploy_health_url",
         "license",
         "agents",
-        "mcps",
+        "mcps",  # retired; rejected by _reject_retired_mcp_flags
+        "browser",  # retired; rejected by _reject_retired_mcp_flags
         "no_plugin",
         "no_egress",
         "non_interactive",

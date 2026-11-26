@@ -70,7 +70,7 @@ def test_no_emitted_file_is_gitignored(tmp_path: Path):
 def test_codex_wiring_is_trackable(tmp_path: Path):
     """The specific regression: .codex/ config must be committable."""
     target = tmp_path / "proj"
-    assert _scaffold(target, "--agents", "claude,codex", "--mcps", "context7") == 0
+    assert _scaffold(target, "--agents", "claude,codex") == 0
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     codex_files = [
         p.relative_to(target).as_posix() for p in target.rglob(".codex/*") if p.is_file()

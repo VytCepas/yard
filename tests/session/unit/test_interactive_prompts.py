@@ -11,7 +11,6 @@ import pytest
 
 import project_init.wizard_prompts as _wiz
 from project_init import __main__
-from project_init.mcps import MCP_CATALOG
 
 
 def test_choose_preset_interactive_out_of_range_reprompts(monkeypatch, capsys):
@@ -28,29 +27,6 @@ def test_choose_preset_interactive_valid_choice(monkeypatch):
     presets = [{"name": "a", "description": "x"}, {"name": "b", "description": "y"}]
     monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: 2)
     assert __main__._choose_preset_interactive(presets) is presets[1]
-
-
-def test_choose_mcps_interactive_parses_and_dedups(monkeypatch):
-    # Duplicates collapse silently; a fully-valid answer needs no re-prompt.
-    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "1,1")
-    selected = __main__._choose_mcps_interactive(MCP_CATALOG)
-    assert [m["id"] for m in selected] == [MCP_CATALOG[0]["id"]]
-
-
-def test_choose_mcps_interactive_invalid_tokens_reprompt(monkeypatch, capsys):
-    """2026-07 QA: out-of-range / non-numeric tokens must not be silently
-    dropped (the non-interactive --mcps path errors on them) — re-ask."""
-    answers = iter(["1,99,abc", "2"])
-    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(answers))
-    selected = __main__._choose_mcps_interactive(MCP_CATALOG)
-    assert [m["id"] for m in selected] == [MCP_CATALOG[1]["id"]]
-    out = capsys.readouterr().out
-    assert "99" in out and "abc" in out
-
-
-def test_choose_mcps_interactive_empty_skips(monkeypatch):
-    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "")
-    assert __main__._choose_mcps_interactive(MCP_CATALOG) == []
 
 
 def test_gather_inputs_interactive_enter_defaults_uses_description_default(monkeypatch):

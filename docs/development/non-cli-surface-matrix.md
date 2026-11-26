@@ -69,6 +69,13 @@ project-init can decide what to emit beyond `.agents/` (epic #359, workstream B)
 
 ## What project-init emits today vs. what each surface needs
 
+> **Update — 2026-11-26:** the scaffold ships **no MCP servers**, so every MCP
+> file named below (`.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`,
+> `.codex/config.toml`, `.agents/mcp_config.json`, `.amp/settings.json`,
+> `.junie/mcp/mcp.json`) and the `context7-http` entry are **no longer
+> emitted**; only the hook files and skill layers remain. The MCP rows and
+> notes below are kept as the surfaces' reference schemas and as history.
+
 > **Update — PI-386 (2026-06-22):** Gemini CLI was removed. Google sunset its
 > free/Pro/Ultra tiers on 2026-06-18; **Antigravity** (`agy`) is now the Google
 > target and reads the same `.agents/` tree. Antigravity is a self-sufficient

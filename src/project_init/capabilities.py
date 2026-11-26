@@ -1,9 +1,9 @@
 """Deterministic capabilities inventory (PI-374, ADR-017).
 
 Generates ``.agents/CAPABILITIES.md`` — a surface-independent list of what the
-scaffold gave the agent (skills, hooks, MCP servers) plus the exact options
+scaffold gave the agent (skills, hooks) plus the exact options
 chosen, derived from the canonical sources (the shared skill set, the scaffolded
-``settings.json`` hooks, the MCP catalog) and the config record. No LLM
+``settings.json`` hooks) and the config record. No LLM
 (ADR-001); regenerated on every scaffold/upgrade so it never drifts. Readable by
 any surface — humans, Claude, Codex, Cursor, Antigravity — one source of truth.
 """
@@ -16,7 +16,6 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from project_init.mcps import resolve_js_runner, servers_for_ids
 from project_init.scaffold import _TEMPLATES_DIR
 
 _NAME_RE = re.compile(r"^name:\s*(.+)$", re.MULTILINE)
@@ -178,13 +177,6 @@ def surface_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
     return rows
 
 
-def _mcp_ids(variables: dict[str, str]) -> list[str]:
-    raw = variables.get("installed_mcps", "none")
-    if raw in ("", "none"):
-        return []
-    return [s.strip() for s in raw.split(",") if s.strip()]
-
-
 def _chosen_options(variables: dict[str, str]) -> list[tuple[str, str]]:
     # Pairs (label, value) read straight from the config record / variables.
     g = variables.get
@@ -199,7 +191,6 @@ def _chosen_options(variables: dict[str, str]) -> list[tuple[str, str]]:
         ("AI governance", "on" if g("governance") else "off"),
         ("Observability", "on" if g("observability") else "off"),
         ("Distribution", "no-plugin" if g("no_plugin") else "plugin"),
-        ("MCP servers", g("installed_mcps", "none") or "none"),
         ("Memory stack", g("memory_stack", "obsidian-only") or "obsidian-only"),
     ]
 
@@ -250,7 +241,6 @@ def render(variables: dict[str, str]) -> str:
     """The CAPABILITIES.md content for a scaffold described by *variables*."""
     skills = canonical_skills_with_source(variables)
     hooks = canonical_hooks(variables)
-    servers = servers_for_ids(_mcp_ids(variables), js_runner=resolve_js_runner(variables))
 
     lines = [
         "# Capabilities",
@@ -297,23 +287,6 @@ def render(variables: dict[str, str]) -> str:
             "",
             *_table(("Config file", "Events"), gui_hooks),
         ]
-    lines += ["", f"## MCP servers ({len(servers)})", ""]
-    if servers:
-        # HTTP-transport servers (e.g. context7-http) carry a url instead of
-        # command+args — surface it rather than an empty Invocation cell
-        # (mirrors governance._server_transport).
-        rows = [
-            (
-                name,
-                spec.get("url", "")
-                if spec.get("type") == "http" or spec.get("url")
-                else " ".join([spec.get("command", "")] + spec.get("args", [])).strip(),
-            )
-            for name, spec in sorted(servers.items())
-        ]
-        lines += _table(("Server", "Invocation"), rows)
-    else:
-        lines.append("_None selected._")
     lines.append("")
     return "\n".join(lines)
 

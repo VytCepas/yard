@@ -25,7 +25,7 @@ class TestREADMEExampleCommand:
         # This is the exact command from README.md's "Example command" section:
         # project-init /path/to/my-project --non-interactive \
         #   --preset obsidian-only --name example --description "example python project" \
-        #   --language python --mcps context7
+        #   --language python
 
         # Use subprocess to invoke the actual CLI (validates argument parsing, flags, etc)
         result = subprocess.run(
@@ -43,8 +43,6 @@ class TestREADMEExampleCommand:
                 "example python project",
                 "--language",
                 "python",
-                "--mcps",
-                "context7",
                 "--strict",
             ],
             capture_output=True,

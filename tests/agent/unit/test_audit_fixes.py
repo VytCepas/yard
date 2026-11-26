@@ -2,7 +2,7 @@
 
 Covers the source-level fixes that don't fit an existing focused module:
 the pre-#466 memory_stack upgrade backfill, preset [vars] reaching the render
-context, and the wizard honoring --mcps.
+context.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from project_init import scaffold as sc
-from project_init.__main__ import _gather_mcps_interactive
 from project_init.upgrade import (
     _backfill_variables,
     _carry_rag_endpoint,
@@ -160,35 +159,6 @@ class TestCarryRagEndpoint:
     def test_no_endpoint_line_is_a_no_op(self):
         no_rag = "memory:\n  tier: 2\n\n"
         assert _carry_rag_endpoint(self._OLD, no_rag) == no_rag
-
-
-class TestWizardHonorsMcpsFlag:
-    """--mcps passed without --non-interactive must be honored, not dropped."""
-
-    def test_cli_mcps_resolved_without_catalog_prompt(self, monkeypatch):
-        # --mcps pins the catalog picks without the multi-select, but browser
-        # automation is its own selectable concern (ADR-023): it must still be
-        # OFFERED when --browser was not given, matching how devcontainer/mise/
-        # vscode still prompt in the same run (2026-07 review).
-        offered = []
-        monkeypatch.setattr(
-            "project_init.wizard_prompts._choose_browser_interactive",
-            lambda: offered.append(True) or False,
-        )
-        selected = _gather_mcps_interactive("context7", False)
-        assert [m["id"] for m in selected] == ["context7"]
-        assert offered, "browser concern must still be offered (ADR-023)"
-
-    def test_cli_mcps_browser_prompt_accept_adds_playwright(self, monkeypatch):
-        monkeypatch.setattr("project_init.wizard_prompts._choose_browser_interactive", lambda: True)
-        selected = _gather_mcps_interactive("context7", False)
-        assert [m["id"] for m in selected] == ["context7", "playwright"]
-
-    def test_cli_mcps_with_browser(self):
-        selected = _gather_mcps_interactive("context7", True)
-        ids = [m["id"] for m in selected]
-        assert "context7" in ids
-        assert "playwright" in ids
 
 
 class TestRunCommandModuleName:

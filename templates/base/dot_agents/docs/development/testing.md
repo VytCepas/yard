@@ -15,7 +15,7 @@
 | Business logic | Unit tests, no I/O |
 | DB queries | Integration tests against real DB |
 | External APIs | Integration tests or contract tests |
-| UI behaviour | E2E tests (Playwright if configured) |
+| UI behaviour | E2E tests (a browser test runner, if configured) |
 
 ## Running tests
 

@@ -3,13 +3,13 @@
 Every `_prompt*`/`_choose_*_interactive` and the `_gather_inputs_interactive`
 orchestrator live here (PI-794). The choosers call each other and the pure
 resolvers in `variables`; tests monkeypatch these on THIS module. Imports only
-console/mcps/scaffold/variables — never subcommands or the CLI spine.
+console/scaffold/variables — never subcommands or the CLI spine.
 """
 
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,6 @@ from project_init.console import (
     render_presets,
 )
 from project_init.host_profile import BoxProfile
-from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP
 from project_init.naming import check_name
 from project_init.scaffold import load_preset, memory_tier
 from project_init.variables import (
@@ -40,7 +39,6 @@ from project_init.variables import (
     _declared_python_floor,
     _profile_delivery_no_plugin,
     _profile_enforcement,
-    _resolve_mcps_non_interactive,
     _text_field_error,
     resolve_agents,
     resolve_delivery,
@@ -152,72 +150,6 @@ def _choose_preset_interactive(presets: list[dict[str, Any]]) -> dict[str, Any]:
 
     choice = _prompt_menu_index("Choose a preset", len(presets), default=default_idx)
     return presets[choice - 1]
-
-
-def _choose_mcps_interactive(
-    catalog: list[dict[str, Any]], default_ids: tuple[str, ...] | None = None
-) -> list[dict[str, Any]]:
-    from rich.prompt import Prompt
-
-    console.print(
-        "\n[bold]MCP servers[/bold] — optional plug-in tool servers your agent "
-        "can call (Model Context Protocol):"
-    )
-    for i, m in enumerate(catalog, 1):
-        console.print(option_line(i, m["name"], m["description"]))
-    console.print()
-    # Box-profile seed (BOX-1): Enter keeps the seeded selection instead of
-    # skipping — the seed is the DEFAULT here, still fully changeable.
-    enter_selection = [m for m in catalog if m["id"] in (default_ids or ())]
-    label = "Choose MCPs (comma-separated numbers, or Enter to skip)"
-    if default_ids:
-        console.print(f"[dim]Enter keeps the box-profile default: {', '.join(default_ids)}[/dim]")
-        label = "Choose MCPs (comma-separated numbers, or Enter for the default)"
-
-    while True:
-        raw = Prompt.ask(label, default="")
-        if not raw.strip():
-            return enter_selection
-
-        selected = []
-        seen: set[str] = set()
-        invalid: list[str] = []
-        for part in raw.split(","):
-            part = part.strip()
-            if not part:
-                continue
-            idx = int(part) - 1 if part.isdigit() else -1
-            if 0 <= idx < len(catalog):
-                if catalog[idx]["id"] not in seen:
-                    selected.append(catalog[idx])
-                    seen.add(catalog[idx]["id"])
-            else:
-                invalid.append(part)
-        if invalid:
-            # Mirror the non-interactive --mcps behavior: never silently drop
-            # part of the user's selection (2026-07 QA) — re-ask instead.
-            console.print(
-                f"[red]Invalid selection(s): {', '.join(invalid)}. "
-                f"Enter numbers 1-{len(catalog)}.[/red]"
-            )
-            continue
-        return selected
-
-
-def _choose_browser_interactive() -> bool:
-    # A genuine selectable add-on, so it explains its value too (#472/ADR-023,
-    # Codex review) — not a bare yes/no. _explain_and_confirm is defined below;
-    # this runs at wizard time, after the module is fully loaded.
-    return _explain_and_confirm(
-        "Browser automation (Playwright MCP)",
-        "Adds the [bold]Playwright MCP[/bold] so the agent can drive a real "
-        "browser — navigate, click, fill forms, and screenshot.\n\n"
-        "[cyan]Helps:[/cyan] end-to-end web testing, scraping, and visual checks "
-        "from the agent.\n"
-        "[dim]Cost: installs Playwright + a browser engine. Off by default.[/dim]",
-        "Add Playwright (browser automation)?",
-        default=False,
-    )
 
 
 def _choose_profile_interactive(default: str | None = None) -> str:
@@ -635,36 +567,6 @@ def _resolve_overlays_interactive(
     return resolved_delivery, resolved_deploy, resolved_iac
 
 
-def _gather_mcps_interactive(
-    cli_mcps: str, cli_browser: bool, default_ids: tuple[str, ...] | None = None
-) -> list[dict[str, Any]]:
-    """Resolve MCPs for the wizard: honor --mcps/--browser, else prompt (PI review).
-
-    A bad ``--mcps`` id warns and falls back to the catalog rather than crashing
-    the wizard mid-run.
-    """
-    if cli_mcps.strip():
-        try:
-            selected = _resolve_mcps_non_interactive(cli_mcps, cli_browser)
-        except ValueError as e:
-            console.print(f"[red]{e}[/red] — choose from the catalog instead.")
-        else:
-            # --mcps pins the catalog picks, but browser automation is its own
-            # concern (ADR-023) — still offer it when --browser was not given,
-            # matching how devcontainer/mise/vscode still prompt in the same run.
-            if not cli_browser and _choose_browser_interactive():
-                selected = selected + [PLAYWRIGHT_MCP]
-            return selected
-    selected = (
-        _choose_mcps_interactive(MCP_CATALOG)
-        if default_ids is None
-        else _choose_mcps_interactive(MCP_CATALOG, default_ids=default_ids)
-    )
-    if cli_browser or _choose_browser_interactive():
-        selected = selected + [PLAYWRIGHT_MCP]
-    return selected
-
-
 def _print_wizard_guidance() -> None:
     """Frame the interactive path so defaults feel intentional, not mysterious."""
     from rich.panel import Panel
@@ -695,7 +597,7 @@ _GATEWAY_GROUPS: tuple[tuple[str, str, str], ...] = (
     (
         "integrations",
         "Integrations",
-        "MCP servers, browser automation, agent surfaces — defaults: none, off, claude+vscode",
+        "agent surfaces — default: claude+vscode",
     ),
     (
         "extras",
@@ -751,8 +653,6 @@ class _CliSeeds:
     no_docs: bool
     no_renovate: bool
     no_coauthor: bool
-    mcps: str
-    browser: bool
     agents: str | None
     owner: str
     license_choice: str
@@ -801,11 +701,9 @@ class _GatewayState:
     # Empty = the render derives the floor (a declared one, else the supported
     # floor); only the opened extras group may fill it interactively.
     python_version: str = ""
-    mcps: list[dict[str, Any]] = field(default_factory=list)
     # Box-profile seeds (BOX-1): recorded so an OPENED group presents the seed
     # as its chooser default instead of resetting to factory (PR #898 review).
     seeded_agents: tuple[str, ...] | None = None
-    seeded_mcp_ids: tuple[str, ...] | None = None
     seeded_profile: str | None = None
     # Deploy identity (PI-899): empty = derive at render (slug/us-central1/none).
     deploy_app: str = ""
@@ -871,16 +769,6 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
     if overlays_need_prompt:
         force_open.add("delivery")
 
-    mcps: list[dict[str, Any]] = []
-    if seeds.mcps.strip():
-        try:
-            mcps = _resolve_mcps_non_interactive(seeds.mcps, seeds.browser)
-        except ValueError as e:
-            console.print(f"[red]{e}[/red] — choose from the catalog instead.")
-            force_open.add("integrations")
-    elif seeds.browser:
-        mcps = [PLAYWRIGHT_MCP]
-
     # The chooser's Enter default is vscode-plus-claude (its option 1 is the
     # vscode surface; panel says "Default: vscode only (plus claude)") — NOT
     # the non-interactive path's claude-only default. Equivalence (ADR-029)
@@ -901,7 +789,6 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
         delivery=delivery,
         deploy=deploy,
         iac=iac,
-        mcps=mcps,
         agents=agents,
         agents_pinned=agents_pinned,
         owner=seeds.owner or "",
@@ -951,14 +838,10 @@ def _apply_box_profile(
             state.agents = list(dict.fromkeys(valid))
             state.seeded_agents = tuple(state.agents)
             seeded.append(f"agents={','.join(state.agents)}")
-    if box.mcp_roster and not seeds.mcps.strip() and not seeds.browser:
-        by_id = {m["id"]: m for m in MCP_CATALOG}
-        valid_mcps = [by_id[i] for i in dict.fromkeys(box.mcp_roster) if i in by_id]
-        ignored += [i for i in box.mcp_roster if i not in by_id]
-        if valid_mcps:
-            state.mcps = valid_mcps
-            state.seeded_mcp_ids = tuple(m["id"] for m in valid_mcps)
-            seeded.append(f"mcps={','.join(state.seeded_mcp_ids)}")
+    # No MCP servers ship (operator decision 2026-11-26): the catalog is empty,
+    # so every roster id is unknown to it — ignored and named in the advisory
+    # line, as contracts/host-profile.md already specifies for unknown ids.
+    ignored += list(box.mcp_roster)
     if box.profile is not None and seeds.profile is None:
         state.profile = box.profile
         state.seeded_profile = box.profile
@@ -980,11 +863,7 @@ def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
             ("--deploy-region", seeds.deploy_region),
             ("--deploy-health-url", seeds.deploy_health_url),
         ),
-        "integrations": (
-            ("--mcps", seeds.mcps.strip()),
-            ("--browser", seeds.browser),
-            ("--agents", seeds.agents),
-        ),
+        "integrations": (("--agents", seeds.agents),),
         "extras": (
             ("--devcontainer", seeds.devcontainer),
             ("--mise", seeds.mise),
@@ -1055,15 +934,7 @@ def _apply_delivery_group(state: _GatewayState, seeds: _CliSeeds) -> None:
 
 
 def _apply_integrations_group(state: _GatewayState, seeds: _CliSeeds) -> None:
-    # Honor --mcps/--browser as before; --mcps still leaves the browser concern
-    # independently decidable inside the group (ADR-023). An explicit --agents
-    # (incl. `--agents claude`) stays pinned — flag beats prompt.
-    if state.seeded_mcp_ids is None:
-        state.mcps = _gather_mcps_interactive(seeds.mcps, seeds.browser)
-    else:
-        state.mcps = _gather_mcps_interactive(
-            seeds.mcps, seeds.browser, default_ids=state.seeded_mcp_ids
-        )
+    # An explicit --agents (incl. `--agents claude`) stays pinned — flag beats prompt.
     if not state.agents_pinned:
         state.agents = (
             _choose_agents_interactive()
@@ -1213,8 +1084,7 @@ def _choose_gateway_interactive(pinned: dict[str, list[str]]) -> set[str]:
             else:
                 invalid.append(part)
         if invalid:
-            # Same contract as the MCP picker: never silently drop part of the
-            # user's selection — re-ask instead.
+            # Never silently drop part of the user's selection — re-ask instead.
             console.print(
                 f"[red]Invalid selection(s): {', '.join(invalid)}. "
                 f"Enter numbers 1-{len(_GATEWAY_GROUPS)}.[/red]"
@@ -1248,7 +1118,7 @@ def _print_resolution_summary(
     an informed decision, not a silent shortcut — the ADR-023 guarantee on the
     collapsed path) and re-rendered before bootstrap when an opened group
     changed anything. Leads with the real security surface: enforcement,
-    egress, lifecycle gate, MCP/agent capabilities, governance. The per-row
+    egress, lifecycle gate, agent capabilities, governance. The per-row
     notes are compressed digests of the choosers' own ADR-023 panels.
     """
     from rich.table import Table
@@ -1271,11 +1141,6 @@ def _print_resolution_summary(
             "lifecycle / review cycles",
             f"{inputs.lifecycle} / {inputs.review_cycles}",
             "issue→branch→PR gates + merge review depth · adds process",
-        ),
-        (
-            "MCP servers",
-            ", ".join(m["id"] for m in inputs.selected_mcps) or "(none)",
-            "each server = a new tool/egress capability",
         ),
         (
             "agent surfaces",
@@ -1368,8 +1233,6 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_language: str | None = None,
     cli_owner: str = "",
     cli_license: str = "none",
-    cli_mcps: str = "",
-    cli_browser: bool = False,
     cli_devcontainer: bool = False,
     cli_mise: bool = False,
     cli_vscode: bool = False,
@@ -1383,7 +1246,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     preset_name: str = "",
     box_profile: BoxProfile | None = None,
 ) -> ScaffoldInputs:
-    """Prompt for the profile, project basics, MCPs, governance, and overlays.
+    """Prompt for the profile, project basics, governance, and overlays.
 
     ``cli_overlays`` pre-seeds the overlay flags (delivery, deploy, iac,
     multi_model, governance, observability) from the CLI; the string slots may
@@ -1391,12 +1254,10 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     prompts (ADR-016/ADR-018/ADR-019).
 
     The ``cli_*`` params pre-seed the basic-field prompts from the CLI so a mixed
-    invocation like ``project-init --name x --mcps context7 --browser`` (without
+    invocation like ``project-init --name x --devcontainer`` (without
     ``--non-interactive``) honors those flags instead of silently dropping them
-    (PI review 2026-07): the string values become prompt defaults; ``--mcps``
-    resolves non-interactively (falling back to the catalog on a bad id); and the
-    store_true toggles (browser/devcontainer/mise/vscode) skip their prompt when
-    set.
+    (PI review 2026-07): the string values become prompt defaults; and the
+    store_true toggles (devcontainer/mise/vscode) skip their prompt when set.
 
     ADR-029 (the gateway collapse): the default path asks six questions —
     preset (before this function), name, description, language, the Customize
@@ -1457,8 +1318,6 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         no_docs=no_docs,
         no_renovate=no_renovate,
         no_coauthor=no_coauthor,
-        mcps=cli_mcps,
-        browser=cli_browser,
         agents=cli_agents,
         owner=cli_owner,
         license_choice=cli_license,
@@ -1485,7 +1344,6 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             project_name=project_name,
             project_description=project_description,
             language=language,
-            selected_mcps=state.mcps,
             owner=state.owner,
             license_choice=state.license_choice,
             devcontainer=state.devcontainer,

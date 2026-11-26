@@ -24,7 +24,6 @@ def _inputs(memory: str) -> ScaffoldInputs:
         project_name="p",
         project_description="d",
         language="python",
-        selected_mcps=[],
         owner="",
         license_choice="none",
         devcontainer=False,
