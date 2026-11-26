@@ -30,6 +30,15 @@ failures fail open (never blocks an install just because the registry couldn't
 be reached). A guardrail, not a substitute for lockfile pinning and hash
 verification (PI-564).
 
+## Release-age hold — new versions wait 7 days
+
+A lockfile pins whatever was newest when it was written, poisoned or not. So the
+resolvers only take versions published at least 7 days ago: `exclude-newer` in
+`pyproject.toml`, `minimumReleaseAge` in `bunfig.toml`, and `minimumReleaseAge`
+in `renovate.json` so update PRs ask for nothing the resolver would refuse.
+Don't lower the hold to get a fresh release. Exempt that one package instead
+(`exclude-newer-package` / `minimumReleaseAgeExcludes`).
+
 {{#if other_agents}}## Per-surface wiring matrix
 
 Only the Claude Code path is functionally CI-tested. Agent overlays are

@@ -11,4 +11,11 @@ coverageThreshold = 0.7
 # changing that default can't silently start counting *.test.ts lines
 # toward the gate).
 coverageSkipTestFiles = true
+
+# Supply chain: resolve only versions published 7+ days ago, since poisoned
+# releases are usually pulled within hours. Exempt one package with
+# minimumReleaseAgeExcludes. Dependency install scripts never run unless listed
+# in package.json trustedDependencies.
+[install]
+minimumReleaseAge = 604800
 {{/if node}}
