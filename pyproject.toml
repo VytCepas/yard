@@ -144,3 +144,7 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
 ]
+
+# Supply chain: resolve only versions uploaded 7+ days ago; the scaffold ships the same hold (PI-1142).
+[tool.uv]
+exclude-newer = "7 days"

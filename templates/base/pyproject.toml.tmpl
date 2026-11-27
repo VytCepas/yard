@@ -38,6 +38,12 @@ dev = [
     "ruff>=0.14",
 ]
 
+# Supply chain: resolve only versions uploaded 7+ days ago, since poisoned
+# releases are usually pulled within hours. Exempt one package with
+# exclude-newer-package = { name = false }.
+[tool.uv]
+exclude-newer = "7 days"
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
